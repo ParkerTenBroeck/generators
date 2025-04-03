@@ -77,7 +77,8 @@ public class GeneratorClassLoader extends ClassLoader {
                     if (!mem.flags().has(AccessFlag.STATIC)) {
                         mts = mts.insertParameterTypes(0, clm.thisClass().asSymbol());
                     }
-                    var gb = new GeneratorBuilder("Gen" + customClazzDefMap.size(), mts.parameterArray());
+                    var name = "Gen_" + clm.thisClass().name().stringValue() + "_" + mem.methodName().stringValue() + "_" + customClazzDefMap.size();
+                    var gb = new GeneratorBuilder(name, mts.parameterArray());
                     mb.withCode(gb::buildGeneratorMethodShim);
                     addGenerator(gb.CD_this_gen.displayName(), gb.buildGenerator(com));
                 } else mb.with(me);

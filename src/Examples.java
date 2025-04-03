@@ -66,6 +66,17 @@ public class Examples {
 //    }
 
     public static Gen<Double, Void> test(double[] nyas){
+
+        var test = 1+switch(nyas[0]){
+            case 1.0 -> {
+                Gen.yield(11);
+                yield 2;
+            }
+            default -> {
+                Gen.yield(12);
+                yield 4;
+            }
+        };
         for(var d : nyas){
             Gen.yield(d);
         }

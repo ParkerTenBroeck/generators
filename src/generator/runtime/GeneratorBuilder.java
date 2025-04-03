@@ -99,6 +99,7 @@ public class GeneratorBuilder {
     }
 
     private void generateStateMachine(ClassBuilder clb, CodeBuilder cob, CodeModel com){
+
         var stateSwitchCases = new ArrayList<SwitchCase>();
         var invalidState = cob.newLabel();
         stateSwitchCases.add(SwitchCase.of(0, cob.newLabel()));
