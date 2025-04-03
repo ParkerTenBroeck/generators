@@ -22,13 +22,8 @@ import static java.lang.classfile.attribute.StackMapFrameInfo.SimpleVerification
 
 public class Fun {
     public static void main(String... args) throws Exception {
-//        var loader = new GeneratorClassLoader(Fun.class.getClassLoader());
-//        loader.loadClass(Fun.class.getName()).getMethod("run").invoke(null);
-        var thread = new Thread(() -> {
-            Fun.run();
-        });
-        thread.setContextClassLoader(new GeneratorClassLoader(Fun.class.getClassLoader()));
-        thread.start();
+        var loader = new GeneratorClassLoader(Fun.class.getClassLoader());
+        loader.loadClass(Fun.class.getName()).getMethod("run").invoke(null);
     }
 
     public static void run() {
@@ -80,7 +75,6 @@ public class Fun {
             try (var stream = Fun.class.getResourceAsStream(p)) {
                 var bytes = Objects.requireNonNull(stream).readAllBytes();
                 bytes = searchForGenerators(bytes);
-                Files.write(Path.of("cs/" + name + ".class"), bytes);
                 customClazzDefMap.put(name, bytes);
                 customClazzMap.put(name, defineClass(name, bytes, 0, bytes.length));
                 return customClazzMap.get(name);
@@ -164,11 +158,6 @@ public class Fun {
                         });
                     }
             );
-            try {
-                Files.write(Path.of("cs/" + cd.displayName() + ".class"), bytes);
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
             customClazzDefMap.put(cd.displayName(), bytes);
             return cd;
         }

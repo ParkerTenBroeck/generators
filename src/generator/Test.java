@@ -1,6 +1,5 @@
 package generator;
 
-import fastexpr.stages.Lexer;
 
 public class Test {
 //    public static Gen<String, Void> gen() {
@@ -49,22 +48,22 @@ public class Test {
             char curr = input.charAt(pos++);
 
             switch (curr){
-                case '(' -> Gen.yield(Lexer.Punc.LPar);
-                case ')' -> Gen.yield(Lexer.Punc.RPar);
-                case '+' -> Gen.yield(Lexer.Punc.Add);
-                case '-' -> Gen.yield(Lexer.Punc.Sub);
-                case '/' -> Gen.yield(Lexer.Punc.Div);
-                case '*' -> Gen.yield(Lexer.Punc.Mul);
-                case ',' -> Gen.yield(Lexer.Punc.Comma);
-                case '^' -> Gen.yield(Lexer.Punc.Carrot);
-                case '=' -> Gen.yield(Lexer.Punc.Equals);
+                case '(' -> Gen.yield(Punc.LPar);
+                case ')' -> Gen.yield(Punc.RPar);
+                case '+' -> Gen.yield(Punc.Add);
+                case '-' -> Gen.yield(Punc.Sub);
+                case '/' -> Gen.yield(Punc.Div);
+                case '*' -> Gen.yield(Punc.Mul);
+                case ',' -> Gen.yield(Punc.Comma);
+                case '^' -> Gen.yield(Punc.Carrot);
+                case '=' -> Gen.yield(Punc.Equals);
                 case char c when Character.isWhitespace(c) -> {}
                 case char c when Character.isAlphabetic(c) -> {
                     while((Character.isLetter(curr) || Character.isLetterOrDigit(curr))){
                         if(pos>=input.length())break;
                         curr = input.charAt(pos++);
                     }
-                    Gen.yield(new Lexer.Ident(input.substring(start, pos-1)));
+                    Gen.yield(new Ident(input.substring(start, pos-1)));
                 }
                 case char c when '0' <= c && c <= '9' -> {
                     boolean exp = false;
@@ -80,7 +79,7 @@ public class Test {
                         }
                     }
 
-                    Gen.yield(new Lexer.Numeric(Double.parseDouble(input.substring(start, pos-1).replace("_", ""))));
+                    Gen.yield(new Numeric(Double.parseDouble(input.substring(start, pos-1).replace("_", ""))));
                 }
                 default -> throw new RuntimeException("Invalid char " + curr);
             }
