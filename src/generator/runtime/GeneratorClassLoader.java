@@ -70,7 +70,7 @@ public class GeneratorClassLoader extends ClassLoader {
                     } else{
                         var gcd = generatorMethod(cb, mem, clm);
                         innerCl.add(InnerClassInfo.of(gcd, Optional.of(clm.thisClass().asSymbol()), Optional.of(gcd.displayName()), AccessFlag.PUBLIC, AccessFlag.FINAL, AccessFlag.STATIC));
-//                        nestMem.add(ClassDesc.of(gcd.displayName()));
+                        nestMem.add(ClassDesc.of(gcd.displayName()));
                     }
                 }
                 else if (ce instanceof Attribute<?> e){
