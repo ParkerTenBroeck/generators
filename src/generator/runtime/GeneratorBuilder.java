@@ -3,9 +3,13 @@ package generator.runtime;
 import generator.Gen;
 
 import java.lang.classfile.*;
+import java.lang.classfile.attribute.InnerClassInfo;
+import java.lang.classfile.attribute.InnerClassesAttribute;
+import java.lang.classfile.attribute.NestHostAttribute;
 import java.lang.constant.ClassDesc;
 import java.lang.constant.ConstantDescs;
 import java.lang.constant.MethodTypeDesc;
+import java.lang.reflect.AccessFlag;
 import java.util.*;
 
 public class GeneratorBuilder {
@@ -23,19 +27,19 @@ public class GeneratorBuilder {
     public final static MethodTypeDesc MTD_Gen = MethodTypeDesc.of(CD_Gen);
     public static MethodTypeDesc MTD_Obj = MethodTypeDesc.of(ConstantDescs.CD_Object);
 
-    public final String name;
-    public final ClassDesc CD_this_gen;
+    public final ClassDesc CD_this;
     public final ClassDesc[] params;
     public final MethodTypeDesc MTD_init;
     public final int paramSlotOff;
+    public final ClassModel clm;
 
     public interface ParamConsumer{
         void consume(String param, int slot, ClassDesc type);
     }
 
-    public GeneratorBuilder(String name, ClassDesc[] params){
-        this.name = name;
-        CD_this_gen = ClassDesc.of(name);
+    public GeneratorBuilder(ClassModel clm, ClassDesc cd, ClassDesc[] params){
+        this.clm = clm;
+        CD_this = cd;
         this.params = params;
         MTD_init = MethodTypeDesc.of(ConstantDescs.CD_void, params);
         paramSlotOff = Arrays.stream(params).mapToInt(p -> TypeKind.from(p).slotSize()).sum();
@@ -50,15 +54,20 @@ public class GeneratorBuilder {
     }
 
     public void buildGeneratorMethodShim(CodeBuilder cob){
-        cob.new_(CD_this_gen).dup();
+        cob.new_(CD_this).dup();
         params(0, (_, slot, type) -> {
             cob.loadLocal(TypeKind.from(type), slot);
         });
-        cob.invokespecial(CD_this_gen, ConstantDescs.INIT_NAME, MTD_init).areturn();
+        cob.invokespecial(CD_this, ConstantDescs.INIT_NAME, MTD_init).areturn();
     }
 
     public byte[] buildGenerator(CodeModel com){
-        return ClassFile.of(ClassFile.StackMapsOption.STACK_MAPS_WHEN_REQUIRED, ClassFile.DebugElementsOption.PASS_DEBUG, ClassFile.LineNumbersOption.PASS_LINE_NUMBERS, ClassFile.AttributesProcessingOption.PASS_ALL_ATTRIBUTES).build(CD_this_gen, clb -> {
+        return ClassFile.of(ClassFile.StackMapsOption.STACK_MAPS_WHEN_REQUIRED, ClassFile.AttributesProcessingOption.PASS_ALL_ATTRIBUTES).build(CD_this, clb -> {
+
+            clm.findAttributes(Attributes.sourceFile()).forEach(clb::with);
+            clb.with(InnerClassesAttribute.of(InnerClassInfo.of(CD_this, Optional.of(clm.thisClass().asSymbol()), Optional.of(CD_this.displayName().split("\\$")[1]), AccessFlag.PUBLIC, AccessFlag.FINAL, AccessFlag.STATIC)));
+            clb.with(NestHostAttribute.of(clm.thisClass()));
+
             clb.withInterfaces(List.of(clb.constantPool().classEntry(CD_Gen)));
             // parameter fields
             params(0, (param, _, type) -> {
@@ -71,7 +80,7 @@ public class GeneratorBuilder {
             clb.withMethod(ConstantDescs.INIT_NAME, MTD_init, ClassFile.ACC_PUBLIC, mb -> mb.withCode(cob -> {
                 cob.aload(0).invokespecial(ConstantDescs.CD_Object, ConstantDescs.INIT_NAME, ConstantDescs.MTD_void);
                 params(1, (param, slot, type) -> {
-                    cob.aload(0).loadLocal(TypeKind.from(type), slot).putfield(CD_this_gen, param, type);
+                    cob.aload(0).loadLocal(TypeKind.from(type), slot).putfield(CD_this, param, type);
                 });
                 cob.return_();
             }));
@@ -88,7 +97,7 @@ public class GeneratorBuilder {
                 tcob -> new StateMachineBuilder(this, clb, tcob, com).generateStateMachine(),
                 // catch anything set our state to -1 and throw the exception
                 ctb -> ctb.catchingAll(
-                        blc -> blc.aload(0).loadConstant(-1).putfield(CD_this_gen, STATE_NAME, ConstantDescs.CD_int).athrow()
+                        blc -> blc.aload(0).loadConstant(-1).putfield(CD_this, STATE_NAME, ConstantDescs.CD_int).athrow()
                 )
         ).aconst_null().areturn();
     }

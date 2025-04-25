@@ -50,8 +50,8 @@ public class StateMachineBuilder {
         public void handle(StateMachineBuilder smb) {
             if(is_void)smb.cob.aconst_null();
 
-            smb.lt.savingLocals(smb.gb.CD_this_gen, smb.cob, () -> {
-                smb.cob.aload(0).loadConstant(resume_state).putfield(smb.gb.CD_this_gen, GeneratorBuilder.STATE_NAME, TypeKind.INT.upperBound())
+            smb.lt.savingLocals(smb.gb.CD_this, smb.cob, () -> {
+                smb.cob.aload(0).loadConstant(resume_state).putfield(smb.gb.CD_this, GeneratorBuilder.STATE_NAME, TypeKind.INT.upperBound())
                         .new_(GeneratorBuilder.CD_Yield)
                         .dup_x1()
                         .swap()
@@ -76,7 +76,7 @@ public class StateMachineBuilder {
         public void handle(StateMachineBuilder smb) {
             if(is_void)smb.cob.aconst_null();
 
-            smb.cob.aload(0).loadConstant(-1).putfield(smb.gb.CD_this_gen, GeneratorBuilder.STATE_NAME, TypeKind.INT.upperBound())
+            smb.cob.aload(0).loadConstant(-1).putfield(smb.gb.CD_this, GeneratorBuilder.STATE_NAME, TypeKind.INT.upperBound())
                     .new_(GeneratorBuilder.CD_Ret)
                     .dup_x1()
                     .swap()
@@ -97,7 +97,7 @@ public class StateMachineBuilder {
 
         @Override
         public void handle(StateMachineBuilder smb) {
-            smb.cob.aload(0).loadConstant(yield_state).putfield(smb.gb.CD_this_gen, GeneratorBuilder.STATE_NAME, TypeKind.INT.upperBound());
+            smb.cob.aload(0).loadConstant(yield_state).putfield(smb.gb.CD_this, GeneratorBuilder.STATE_NAME, TypeKind.INT.upperBound());
             var start = smb.cob.newBoundLabel();
             smb.cob.dup().dup()
                     .invokeinterface(GeneratorBuilder.CD_Gen, "next", MethodTypeDesc.of(GeneratorBuilder.CD_Res)).dup()
@@ -105,10 +105,10 @@ public class StateMachineBuilder {
             smb.cob.ifThenElse(bcb -> {
                 bcb.checkcast(GeneratorBuilder.CD_Ret).invokevirtual(GeneratorBuilder.CD_Ret, "v", MethodTypeDesc.of(ConstantDescs.CD_Object)).swap().pop();
             }, bcb -> {
-                smb.lt.savingLocals(smb.gb.CD_this_gen, bcb, () -> {
-                    bcb.swap().loadLocal(TypeKind.from(smb.gb.CD_this_gen), 0).swap().putfield(smb.gb.CD_this_gen, "meow", GeneratorBuilder.CD_Gen);
+                smb.lt.savingLocals(smb.gb.CD_this, bcb, () -> {
+                    bcb.swap().loadLocal(TypeKind.from(smb.gb.CD_this), 0).swap().putfield(smb.gb.CD_this, "meow", GeneratorBuilder.CD_Gen);
                     bcb.areturn().labelBinding(yield_label);
-                    bcb.loadLocal(TypeKind.from(smb.gb.CD_this_gen), 0).getfield(smb.gb.CD_this_gen, "meow", GeneratorBuilder.CD_Gen);
+                    bcb.loadLocal(TypeKind.from(smb.gb.CD_this), 0).getfield(smb.gb.CD_this, "meow", GeneratorBuilder.CD_Gen);
                 });
                 bcb.goto_(start);
             });
@@ -148,10 +148,10 @@ public class StateMachineBuilder {
                     handlers.add(handler.apply(this));
             }
         }
-        cob.aload(0).getfield(gb.CD_this_gen, GeneratorBuilder.STATE_NAME, TypeKind.INT.upperBound()).lookupswitch(invalidState, stateSwitchCases);
+        cob.aload(0).getfield(gb.CD_this, GeneratorBuilder.STATE_NAME, TypeKind.INT.upperBound()).lookupswitch(invalidState, stateSwitchCases);
         var start = cob.startLabel();
         var end = cob.newLabel();
-        cob.localVariable(0, "this", gb.CD_this_gen, start, end);
+        cob.localVariable(0, "this", gb.CD_this, start, end);
 
         SpecialMethodHandler currentHandler = null;
 
@@ -189,6 +189,8 @@ public class StateMachineBuilder {
                 }
             }
 
+//            System.out.println(coe);
+
             switch (coe) {
                 // locals which were once function parameters can be ignored
                 case LocalVariable lv when lv.slot() < gb.paramSlotOff -> {
@@ -198,21 +200,21 @@ public class StateMachineBuilder {
 
                 // increment indexes into the stack
                 case IncrementInstruction ii when ii.slot() < gb.paramSlotOff ->
-                        cob.aload(0).dup().getfield(gb.CD_this_gen, GeneratorBuilder.PARAM_PREFIX + ii.slot(), ConstantDescs.CD_int)
+                        cob.aload(0).dup().getfield(gb.CD_this, GeneratorBuilder.PARAM_PREFIX + ii.slot(), ConstantDescs.CD_int)
                                 .loadConstant(ii.constant()).iadd()
-                                .putfield(gb.CD_this_gen, GeneratorBuilder.PARAM_PREFIX + ii.slot(), ConstantDescs.CD_int);
+                                .putfield(gb.CD_this, GeneratorBuilder.PARAM_PREFIX + ii.slot(), ConstantDescs.CD_int);
                 case IncrementInstruction ii -> cob.iinc(ii.slot() - gb.paramSlotOff + 1, ii.constant());
 
                 // convert local function parameters to class fields and offset regular locals
                 case LoadInstruction li when li.slot() < gb.paramSlotOff ->
-                        cob.aload(0).getfield(gb.CD_this_gen, GeneratorBuilder.PARAM_PREFIX + li.slot(), lt.paramType(li.slot()));
+                        cob.aload(0).getfield(gb.CD_this, GeneratorBuilder.PARAM_PREFIX + li.slot(), lt.paramType(li.slot()));
                 case LoadInstruction li -> cob.loadLocal(li.typeKind(), li.slot() - gb.paramSlotOff + 1);
 
                 // convert local function parameters to class fields and offset regular locals
                 case StoreInstruction ls when ls.slot() < gb.paramSlotOff && ls.typeKind().slotSize() == 2 ->
-                        cob.aload(0).dup_x2().pop().putfield(gb.CD_this_gen, GeneratorBuilder.PARAM_PREFIX + ls.slot(), lt.paramType(ls.slot()));
+                        cob.aload(0).dup_x2().pop().putfield(gb.CD_this, GeneratorBuilder.PARAM_PREFIX + ls.slot(), lt.paramType(ls.slot()));
                 case StoreInstruction ls when ls.slot() < gb.paramSlotOff ->
-                        cob.aload(0).swap().putfield(gb.CD_this_gen, GeneratorBuilder.PARAM_PREFIX + ls.slot(), lt.paramType(ls.slot()));
+                        cob.aload(0).swap().putfield(gb.CD_this, GeneratorBuilder.PARAM_PREFIX + ls.slot(), lt.paramType(ls.slot()));
                 case StoreInstruction ls -> {
                     lt.trackLocal(ls.slot() - gb.paramSlotOff + 1, ls.typeKind());
                     cob.storeLocal(ls.typeKind(), ls.slot() - gb.paramSlotOff + 1);

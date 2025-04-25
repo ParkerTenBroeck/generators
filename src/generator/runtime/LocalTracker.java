@@ -33,7 +33,7 @@ class LocalTracker {
             for (var smfi : attr.entries()) {
                 var locals = new ArrayList<>(smfi.locals());
                 for (int i = 0; i < smb.gb.params.length; i++) locals.removeFirst();
-                locals.addFirst(StackMapFrameInfo.ObjectVerificationTypeInfo.of(smb.gb.CD_this_gen));
+                locals.addFirst(StackMapFrameInfo.ObjectVerificationTypeInfo.of(smb.gb.CD_this));
                 entries.add(StackMapFrameInfo.of(smfi.target(), locals, smfi.stack()));
                 stackMapFrames.put(smfi.target(), entries.getLast());
             }

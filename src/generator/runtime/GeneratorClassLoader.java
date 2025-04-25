@@ -4,22 +4,16 @@ import generator.Fun;
 import generator.Gen;
 
 import java.io.IOException;
-import java.io.PrintStream;
 import java.lang.classfile.*;
-import java.lang.classfile.attribute.StackMapFrameInfo;
-import java.lang.classfile.instruction.*;
+import java.lang.classfile.attribute.*;
+import java.lang.classfile.constantpool.ClassEntry;
 import java.lang.constant.ClassDesc;
 import java.lang.constant.ConstantDescs;
-import java.lang.constant.MethodTypeDesc;
 import java.lang.reflect.AccessFlag;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Objects;
-
-import static java.lang.classfile.attribute.StackMapFrameInfo.SimpleVerificationTypeInfo.TOP;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class GeneratorClassLoader extends ClassLoader {
     private final HashMap<String, byte[]> customClazzDefMap = new HashMap<>();
@@ -29,12 +23,19 @@ public class GeneratorClassLoader extends ClassLoader {
         super(parent);
     }
 
+    void add(String name, byte[] def){
+            try {
+                Files.createDirectories(Path.of("out/modified/generators/" + name.replace(".", "/")).getParent());
+                Files.write(Path.of("out/modified/generators/" + name.replace(".", "/") + ".class"), def);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        customClazzDefMap.put(name, def);
+        customClazzMap.put(name, defineClass(name, def, 0, def.length));
+    }
+
     @Override
     public Class<?> loadClass(String name) throws ClassNotFoundException {
-//        if(customClazzDefMap.containsKey(name))
-//            return super.loadClass(name);
-        if (customClazzDefMap.get(name) instanceof byte[] bytes)
-            customClazzMap.put(name, defineClass(name, bytes, 0, bytes.length));
         if (customClazzMap.get(name) instanceof Class<?> clazz)
             return clazz;
         if (name.startsWith("java"))
@@ -43,9 +44,7 @@ public class GeneratorClassLoader extends ClassLoader {
         var p = "/" + name.replace('.', '/') + ".class";
         try (var stream = Fun.class.getResourceAsStream(p)) {
             var bytes = Objects.requireNonNull(stream).readAllBytes();
-            bytes = searchForGenerators(bytes);
-            customClazzDefMap.put(name, bytes);
-            customClazzMap.put(name, defineClass(name, bytes, 0, bytes.length));
+            add(name, searchForGenerators(bytes));
             return customClazzMap.get(name);
         } catch (IOException e) {
             throw new ClassNotFoundException(name, e);
@@ -53,24 +52,44 @@ public class GeneratorClassLoader extends ClassLoader {
     }
 
     public byte[] searchForGenerators(byte[] in) {
-        var clm = ClassFile.of(ClassFile.DebugElementsOption.PASS_DEBUG, ClassFile.LineNumbersOption.PASS_LINE_NUMBERS, ClassFile.AttributesProcessingOption.PASS_ALL_ATTRIBUTES).parse(in);
+        var clm = ClassFile.of(ClassFile.AttributesProcessingOption.PASS_ALL_ATTRIBUTES).parse(in);
         var isGen = clm.thisClass().asSymbol().descriptorString().equals(Gen.class.descriptorString());
-        return ClassFile.of(ClassFile.DebugElementsOption.PASS_DEBUG, ClassFile.LineNumbersOption.PASS_LINE_NUMBERS, ClassFile.AttributesProcessingOption.PASS_ALL_ATTRIBUTES).build(clm.thisClass().asSymbol(), cb -> {
+
+
+        var nestMem = new ArrayList<ClassDesc>();
+        var innerCl = new ArrayList<InnerClassInfo>();
+        clm.findAttributes(Attributes.nestMembers()).forEach(i -> nestMem.addAll(i.nestMembers().stream().map(ClassEntry::asSymbol).toList()));
+        clm.findAttributes(Attributes.innerClasses()).forEach(i -> innerCl.addAll(i.classes()));
+
+        return ClassFile.of(ClassFile.AttributesProcessingOption.PASS_ALL_ATTRIBUTES).build(clm.thisClass().asSymbol(), cb -> {
             for (var ce : clm) {
                 if (ce instanceof MethodModel mem && !isGen) {
                     var methodRetGen = mem.methodTypeSymbol().returnType().descriptorString().equals(Gen.class.descriptorString());
                     if (!methodRetGen) {
                         cb.with(mem);
                     } else{
-                        generatorMethod(cb, mem, clm);
+                        var gcd = generatorMethod(cb, mem, clm);
+                        innerCl.add(InnerClassInfo.of(gcd, Optional.of(clm.thisClass().asSymbol()), Optional.of(gcd.displayName()), AccessFlag.PUBLIC, AccessFlag.FINAL, AccessFlag.STATIC));
+//                        nestMem.add(ClassDesc.of(gcd.displayName()));
                     }
-                } else
-                    cb.with(ce);
+                }
+                else if (ce instanceof Attribute<?> e){
+                    if (e.attributeMapper() != Attributes.nestMembers() && e.attributeMapper() != Attributes.innerClasses())
+                        cb.with(ce);
+                }
+                else cb.with(ce);
             }
+            if(!innerCl.isEmpty())
+                cb.with(InnerClassesAttribute.of(innerCl));
+            if(!nestMem.isEmpty())
+                cb.with(NestMembersAttribute.ofSymbols(nestMem));
         });
     }
 
-    private void generatorMethod(ClassBuilder cb, MethodModel mem, ClassModel clm) {
+    private ClassDesc generatorMethod(ClassBuilder cb, MethodModel mem, ClassModel clm) {
+
+        AtomicReference<ClassDesc> gcd = new AtomicReference<>();
+
         cb.withMethod(mem.methodName(), mem.methodType(), mem.flags().flagsMask(), mb -> {
             for (var me : mem) {
                 if (me instanceof CodeModel com) {
@@ -79,21 +98,17 @@ public class GeneratorClassLoader extends ClassLoader {
                     if (!mem.flags().has(AccessFlag.STATIC)) {
                         mts = mts.insertParameterTypes(0, clm.thisClass().asSymbol());
                     }
-                    var name = "Gen_" + clm.thisClass().name().stringValue() + "_" + mem.methodName().stringValue() + "_" + customClazzDefMap.size();
-                    var gb = new GeneratorBuilder(name, mts.parameterArray());
+                    var name = clm.thisClass().name().stringValue()+"$Gen_" + mem.methodName().stringValue() + "_" + customClazzDefMap.size();
+
+                    gcd.set(ClassDesc.of(clm.thisClass().asSymbol().packageName(), name));
+                    var gb = new GeneratorBuilder(clm, gcd.get(), mts.parameterArray());
+
                     mb.withCode(gb::buildGeneratorMethodShim);
-                    addGenerator(gb.CD_this_gen.displayName(), gb.buildGenerator(com));
+                    add(gb.CD_this.displayName(), gb.buildGenerator(com));
                 } else mb.with(me);
             }
         });
-    }
 
-    protected void addGenerator(String name, byte[] def){
-        try {
-            Files.write(Path.of("out/production/generators/" + name + ".class"), def);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-        customClazzDefMap.put(name, def);
+        return gcd.get();
     }
 }
