@@ -1,7 +1,7 @@
 package generator.runtime;
 
 import generator.Fun;
-import generator.Gen;
+import generator.gen.Gen;
 
 import java.io.IOException;
 import java.lang.classfile.*;

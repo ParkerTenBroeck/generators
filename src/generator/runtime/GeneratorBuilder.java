@@ -1,6 +1,6 @@
 package generator.runtime;
 
-import generator.Gen;
+import generator.gen.Gen;
 
 import java.lang.classfile.*;
 import java.lang.classfile.attribute.InnerClassInfo;

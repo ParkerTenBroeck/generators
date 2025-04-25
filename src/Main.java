@@ -1,5 +1,5 @@
 import generator.Fun;
-import generator.Gen;
+import generator.gen.Gen;
 
 public class Main implements Runnable {
     public static void main(String[] args) {

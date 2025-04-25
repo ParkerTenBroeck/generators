@@ -1,4 +1,4 @@
-import generator.Gen;
+import generator.gen.Gen;
 
 public class Examples {
     //    public static Gen<String, Void> parse(String str){
