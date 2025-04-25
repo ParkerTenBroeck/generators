@@ -31,6 +31,8 @@ public class GeneratorClassLoader extends ClassLoader {
 
     @Override
     public Class<?> loadClass(String name) throws ClassNotFoundException {
+//        if(customClazzDefMap.containsKey(name))
+//            return super.loadClass(name);
         if (customClazzDefMap.get(name) instanceof byte[] bytes)
             customClazzMap.put(name, defineClass(name, bytes, 0, bytes.length));
         if (customClazzMap.get(name) instanceof Class<?> clazz)
@@ -51,9 +53,9 @@ public class GeneratorClassLoader extends ClassLoader {
     }
 
     public byte[] searchForGenerators(byte[] in) {
-        var clm = ClassFile.of().parse(in);
+        var clm = ClassFile.of(ClassFile.DebugElementsOption.PASS_DEBUG, ClassFile.LineNumbersOption.PASS_LINE_NUMBERS, ClassFile.AttributesProcessingOption.PASS_ALL_ATTRIBUTES).parse(in);
         var isGen = clm.thisClass().asSymbol().descriptorString().equals(Gen.class.descriptorString());
-        return ClassFile.of().build(clm.thisClass().asSymbol(), cb -> {
+        return ClassFile.of(ClassFile.DebugElementsOption.PASS_DEBUG, ClassFile.LineNumbersOption.PASS_LINE_NUMBERS, ClassFile.AttributesProcessingOption.PASS_ALL_ATTRIBUTES).build(clm.thisClass().asSymbol(), cb -> {
             for (var ce : clm) {
                 if (ce instanceof MethodModel mem && !isGen) {
                     var methodRetGen = mem.methodTypeSymbol().returnType().descriptorString().equals(Gen.class.descriptorString());

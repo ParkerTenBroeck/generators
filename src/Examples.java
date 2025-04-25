@@ -65,21 +65,42 @@ public class Examples {
 //        return Gen.ret();
 //    }
 
-    public static Gen<Double, Void> test(double[] nyas){
-
-        var test = 1+switch(nyas[0]){
-            case 1.0 -> {
-                Gen.yield(11);
-                yield 2;
-            }
-            default -> {
-                Gen.yield(12);
-                yield 4;
-            }
-        };
-        for(var d : nyas){
-            Gen.yield(d);
-        }
-        return Gen.ret();
+    public static Gen<Void, String> awaitTest2(int number){
+        for(int i = 0; i < number; i ++)Gen.yield();
+        return Gen.ret(number+"");
     }
+
+    public static class Meow implements AutoCloseable{
+        {
+            System.out.println("Opened");
+        }
+        @Override
+        public void close() {
+            System.out.println("Closed");
+        }
+    }
+
+    public static Gen<Void, String> awaitTest(int number){
+        try(var m = new Meow()){
+            return Gen.ret(awaitTest2(number).await());
+        }
+    }
+
+//    public static Gen<Double, Void> test(double[] nyas){
+//
+//        var test = 1+switch(nyas[0]){
+//            case 1.0 -> {
+//                Gen.yield(11);
+//                yield 2;
+//            }
+//            default -> {
+//                Gen.yield(12);
+//                yield 4;
+//            }
+//        };
+//        for(var d : nyas){
+//            Gen.yield(d);
+//        }
+//        return Gen.ret();
+//    }
 }

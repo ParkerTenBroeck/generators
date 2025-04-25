@@ -17,8 +17,7 @@ public interface Gen<Y, R> {
     default R await(){
         while(true){
             var res = next();
-            if(res instanceof Ret(R r))return r;
-            Gen.yield();
+            if(res instanceof Ret r)return (R)r.v;
         }
     }
 
