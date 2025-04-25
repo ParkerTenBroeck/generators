@@ -3,10 +3,17 @@ package generator.runtime;
 import generator.Gen;
 
 import java.lang.classfile.*;
+import java.lang.classfile.attribute.StackMapFrameInfo;
+import java.lang.classfile.instruction.*;
 import java.lang.constant.ClassDesc;
 import java.lang.constant.ConstantDescs;
 import java.lang.constant.MethodTypeDesc;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+
+import static java.lang.classfile.attribute.StackMapFrameInfo.SimpleVerificationTypeInfo.TOP;
 
 public class GeneratorBuilder {
     public final static String PARAM_PREFIX = "param_";
@@ -21,7 +28,7 @@ public class GeneratorBuilder {
     public final static MethodTypeDesc MTD_Res = MethodTypeDesc.of(CD_Res);
     public final static MethodTypeDesc MTD_Gen_Obj = MethodTypeDesc.of(CD_Gen, ConstantDescs.CD_Object);
     public final static MethodTypeDesc MTD_Gen = MethodTypeDesc.of(CD_Gen);
-    public static MethodTypeDesc MTD_Obj = MethodTypeDesc.of(ConstantDescs.CD_Object);
+    public final static MethodTypeDesc MTD_Obj = MethodTypeDesc.of(ConstantDescs.CD_Object);
 
     public final String name;
     public final ClassDesc CD_this_gen;
@@ -58,7 +65,7 @@ public class GeneratorBuilder {
     }
 
     public byte[] buildGenerator(CodeModel com){
-        return ClassFile.of(ClassFile.StackMapsOption.STACK_MAPS_WHEN_REQUIRED, ClassFile.DebugElementsOption.PASS_DEBUG, ClassFile.LineNumbersOption.PASS_LINE_NUMBERS, ClassFile.AttributesProcessingOption.PASS_ALL_ATTRIBUTES).build(CD_this_gen, clb -> {
+        return ClassFile.of(ClassFile.StackMapsOption.STACK_MAPS_WHEN_REQUIRED).build(CD_this_gen, clb -> {
             clb.withInterfaces(List.of(clb.constantPool().classEntry(CD_Gen)));
             // parameter fields
             params(0, (param, _, type) -> {

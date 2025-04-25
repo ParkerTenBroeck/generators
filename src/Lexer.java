@@ -1,8 +1,6 @@
 import generator.Gen;
 
 public class Lexer {
-
-
     public sealed interface Token{}
     public enum Punc implements Token {
         LPar,

@@ -8,8 +8,8 @@ public class Main implements Runnable {
 
     @Override
     public void run() {
-        await();
-//        lexer();
+//        await();
+        lexer();
     }
 
     void await(){
