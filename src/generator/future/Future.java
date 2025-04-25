@@ -11,6 +11,10 @@ public interface Future<R> {
         throw new RuntimeException();
     }
 
+    static <R> Future<R> ret(R r){
+        throw new RuntimeException();
+    }
+
     final class Pending{
         private static final Pending INSTANCE = new Pending();
         private Pending(){}

@@ -8,7 +8,7 @@ import java.util.HashMap;
 
 import static java.lang.classfile.attribute.StackMapFrameInfo.SimpleVerificationTypeInfo.TOP;
 
-class LocalTracker {
+public class LocalTracker {
 
     record LocalStore(String name, ClassDesc cd) {
     }
@@ -23,7 +23,7 @@ class LocalTracker {
 
     LocalTracker(StateMachineBuilder smb, CodeModel com) {
         int offset = 0;
-        for (var param : smb.gb.params) {
+        for (var param : smb.params) {
             parameter_map.put(offset, param);
             offset += TypeKind.from(param).slotSize();
         }
@@ -32,8 +32,8 @@ class LocalTracker {
             var entries = new ArrayList<StackMapFrameInfo>();
             for (var smfi : attr.entries()) {
                 var locals = new ArrayList<>(smfi.locals());
-                for (int i = 0; i < smb.gb.params.length; i++) locals.removeFirst();
-                locals.addFirst(StackMapFrameInfo.ObjectVerificationTypeInfo.of(smb.gb.CD_this));
+                for (int i = 0; i < smb.params.length; i++) locals.removeFirst();
+                locals.addFirst(StackMapFrameInfo.ObjectVerificationTypeInfo.of(smb.CD_this));
                 entries.add(StackMapFrameInfo.of(smfi.target(), locals, smfi.stack()));
                 stackMapFrames.put(smfi.target(), entries.getLast());
             }
@@ -57,7 +57,7 @@ class LocalTracker {
                     break;
                 }
             if (name == null) {
-                name = GeneratorBuilder.LOCAL_PREFIX + localStore.size();
+                name = StateMachineBuilder.LOCAL_PREFIX + localStore.size();
                 localStore.add(new LocalStore(name, desc));
             }
             saved.add(new Saved(slot, name, desc));

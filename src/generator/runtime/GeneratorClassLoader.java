@@ -1,21 +1,18 @@
 package generator.runtime;
 
 import generator.gen.Gen;
+import generator.runtime.gen.GenSMBuilder;
 
 import java.io.IOException;
 import java.lang.classfile.*;
 import java.lang.classfile.attribute.*;
 import java.lang.classfile.constantpool.ClassEntry;
 import java.lang.constant.ClassDesc;
-import java.lang.constant.ConstantDescs;
-import java.lang.reflect.AccessFlag;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicReference;
 
 public class GeneratorClassLoader extends ClassLoader {
-    private final HashMap<String, byte[]> customClazzDefMap = new HashMap<>();
     private final HashMap<String, Class<?>> customClazzMap = new HashMap<>();
 
     public GeneratorClassLoader(ClassLoader parent) {
@@ -23,13 +20,12 @@ public class GeneratorClassLoader extends ClassLoader {
     }
 
     void add(String name, byte[] def){
-            try {
-                Files.createDirectories(Path.of("out/modified/generators/" + name.replace(".", "/")).getParent());
-                Files.write(Path.of("out/modified/generators/" + name.replace(".", "/") + ".class"), def);
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-        customClazzDefMap.put(name, def);
+        try {
+            Files.createDirectories(Path.of("out/modified/generators/" + name.replace(".", "/")).getParent());
+            Files.write(Path.of("out/modified/generators/" + name.replace(".", "/") + ".class"), def);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
         customClazzMap.put(name, defineClass(name, def, 0, def.length));
     }
 
@@ -68,8 +64,8 @@ public class GeneratorClassLoader extends ClassLoader {
                         cb.with(mem);
                     } else{
                         var gcd = generatorMethod(cb, mem, clm);
-                        innerCl.add(InnerClassInfo.of(gcd, Optional.of(clm.thisClass().asSymbol()), Optional.of(gcd.displayName()), AccessFlag.PUBLIC, AccessFlag.FINAL, AccessFlag.STATIC));
-                        nestMem.add(ClassDesc.of(gcd.displayName()));
+//                        innerCl.add(InnerClassInfo.of(gcd, Optional.of(clm.thisClass().asSymbol()), Optional.of(gcd.displayName()), AccessFlag.PUBLIC, AccessFlag.FINAL, AccessFlag.STATIC));
+//                        nestMem.add(ClassDesc.of(gcd.displayName()));
                     }
                 }
                 else if (ce instanceof Attribute<?> e){
@@ -85,29 +81,13 @@ public class GeneratorClassLoader extends ClassLoader {
         });
     }
 
-    private ClassDesc generatorMethod(ClassBuilder cb, MethodModel mem, ClassModel clm) {
-
-        AtomicReference<ClassDesc> gcd = new AtomicReference<>();
-
-        cb.withMethod(mem.methodName(), mem.methodType(), mem.flags().flagsMask(), mb -> {
-            for (var me : mem) {
-                if (me instanceof CodeModel com) {
-                    var mts = mem.methodTypeSymbol();
-                    mts = mts.changeReturnType(ConstantDescs.CD_void);
-                    if (!mem.flags().has(AccessFlag.STATIC)) {
-                        mts = mts.insertParameterTypes(0, clm.thisClass().asSymbol());
-                    }
-                    var name = clm.thisClass().name().stringValue()+"$Gen_" + mem.methodName().stringValue() + "_" + customClazzDefMap.size();
-
-                    gcd.set(ClassDesc.of(clm.thisClass().asSymbol().packageName(), name));
-                    var gb = new GeneratorBuilder(clm, gcd.get(), mts.parameterArray());
-
-                    mb.withCode(gb::buildGeneratorMethodShim);
-                    add(gb.CD_this.displayName(), gb.buildGenerator(com));
-                } else mb.with(me);
-            }
+    private ClassDesc generatorMethod(ClassBuilder cb, MethodModel src_mem, ClassModel src_clm) {
+        var com = src_mem.code().get();
+        var gb = new GenSMBuilder(src_clm, src_mem, com);
+        add(gb.CD_this.displayName(), gb.buildStateMachine());
+        cb.withMethod(src_mem.methodName(), src_mem.methodType(), src_mem.flags().flagsMask(), mb -> {
+            mb.withCode(gb::buildSourceMethodShim);
         });
-
-        return gcd.get();
+        return gb.CD_this;
     }
 }
