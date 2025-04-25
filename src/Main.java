@@ -1,9 +1,9 @@
-import generator.Fun;
+import generator.RT;
 import generator.gen.Gen;
 
 public class Main implements Runnable {
     public static void main(String[] args) {
-        Fun.runWithGeneratorSupport(Main.class);
+        RT.runWithGeneratorSupport(Main.class);
     }
 
     @Override

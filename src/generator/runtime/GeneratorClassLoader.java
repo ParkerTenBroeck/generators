@@ -1,6 +1,5 @@
 package generator.runtime;
 
-import generator.Fun;
 import generator.gen.Gen;
 
 import java.io.IOException;
@@ -42,7 +41,7 @@ public class GeneratorClassLoader extends ClassLoader {
             return super.loadClass(name);
 
         var p = "/" + name.replace('.', '/') + ".class";
-        try (var stream = Fun.class.getResourceAsStream(p)) {
+        try (var stream = GeneratorClassLoader.class.getResourceAsStream(p)) {
             var bytes = Objects.requireNonNull(stream).readAllBytes();
             add(name, searchForGenerators(bytes));
             return customClazzMap.get(name);

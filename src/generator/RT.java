@@ -3,9 +3,9 @@ package generator;
 
 import generator.runtime.GeneratorClassLoader;
 
-public class Fun {
+public class RT {
     public static void runWithGeneratorSupport(Class<? extends Runnable> clazz){
-        var loader = new GeneratorClassLoader(Fun.class.getClassLoader());
+        var loader = new GeneratorClassLoader(RT.class.getClassLoader());
         try{
             ((Runnable)loader.loadClass(clazz.getName()).getConstructor().newInstance()).run();
         }catch (Exception e){
