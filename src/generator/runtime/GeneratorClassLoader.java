@@ -102,7 +102,13 @@ public class GeneratorClassLoader extends ClassLoader {
     private StateMachineBuilder futureMethod(ClassBuilder cb, MethodModel src_mem, ClassModel src_clm) {
         var com = src_mem.code().get();
         var smb = new FutureSMBuilder(src_clm, src_mem, com);
-        add(smb.CD_this.displayName(), smb.buildStateMachine());
+        try{
+            add(smb.CD_this.displayName(), smb.buildStateMachine());
+        }catch (Exception ignore){
+            cb.withMethod(src_mem.methodName(), src_mem.methodType(), src_mem.flags().flagsMask(), mb -> {
+                mb.with(com);
+            });
+        }
         cb.withMethod(src_mem.methodName(), src_mem.methodType(), src_mem.flags().flagsMask(), mb -> {
             mb.withCode(smb::buildSourceMethodShim);
         });

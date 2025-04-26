@@ -2,9 +2,8 @@ package generator.future;
 
 public interface Future<R> {
 
-    @SuppressWarnings("unchecked")
-    default R poll(Waker waker){
-        return (R)Pending.INSTANCE;
+    default Object poll(Waker waker){
+        return Pending.INSTANCE;
     }
 
     default R await(){

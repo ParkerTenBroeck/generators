@@ -1,5 +1,8 @@
 import generator.future.Future;
-import generator.gen.Gen;
+import generator.future.Waker;
+
+import java.util.Timer;
+import java.util.TimerTask;
 
 public class Examples {
     //    public static Gen<String, Void> parse(String str){
@@ -66,22 +69,35 @@ public class Examples {
 //        return Gen.ret();
 //    }
 
-//    public static Future<String> awaitTest2(int number){
-//        for(int i = 0; i < number; i ++)Future.yield();
-//        return Future.ret(number+"");
-//    }
+    public static class Delay implements Future<String>{
 
-    public static Future<String> awaitTest(int number){
-        int i = 0;
-//        Future.yield();
-//        i = 1;
-//        Future.yield();
-//        i += i*12;
-//        Future.yield();
-//        return Future.ret(awaitTest2(number).await());
-        for(; i < number; i++)
-            Future.yield();
-        return Future.ret("meow"+i);
+        private final int delay;
+        private boolean ready;
+        public Delay(int ms){
+            delay = ms;
+        }
+        @Override
+        public Object poll(Waker waker) {
+            new Timer().schedule(new TimerTask() {
+                @Override
+                public void run() {
+                    ready = true;
+                    waker.wake();
+                }
+            }, delay);
+            if(ready)return null;
+            return Pending.INSTANCE;
+        }
+    }
+
+    public static Future<String> awaitTest2(int number){
+        ((Future<?>)new Delay(number)).await();
+        return Future.ret(number+"ms");
+    }
+
+    public Future<String> awaitTest(int number){
+        var result = awaitTest2(number).await();
+        return Future.ret("Result: " + result);
     }
 
 //    public static Gen<Double, Void> test(double[] nyas){

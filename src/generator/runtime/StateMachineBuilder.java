@@ -30,7 +30,7 @@ public abstract class StateMachineBuilder {
     public final MethodModel src_mem;
     public final CodeModel src_com;
 
-    public final LocalTracker lt;
+    public LocalTracker lt;
 
     protected HashMap<SpecialMethod, BiFunction<StateMachineBuilder, CodeBuilder, SpecialMethodHandler>> smmap = new HashMap<>();
 
@@ -64,8 +64,6 @@ public abstract class StateMachineBuilder {
         this.params = mts.parameterArray();
         this.MTD_init = MethodTypeDesc.of(ConstantDescs.CD_void, params);
         this.paramSlotOff = Arrays.stream(params).mapToInt(p -> TypeKind.from(p).slotSize()).sum();
-
-        this.lt = new LocalTracker(this, src_com);
     }
 
     public int add_state(Label label) {
@@ -135,6 +133,8 @@ public abstract class StateMachineBuilder {
     public void buildStateMachineCode(ClassBuilder clb, CodeBuilder cob, int loc_param_off) {
         boolean ignore_next_pop = false;
 
+        this.lt = new LocalTracker(this, src_com, loc_param_off);
+
         var invalidState = cob.newLabel();
         var start_label = cob.newLabel();
         add_state(start_label);
@@ -147,6 +147,8 @@ public abstract class StateMachineBuilder {
                     handlers.add(handler.apply(this, cob));
             }
         }
+//        if(handlers.isEmpty() && stateSwitchCases.isEmpty())
+//            throw new RuntimeException("Not a state machine");
         cob.aload(0).getfield(CD_this, STATE_NAME, TypeKind.INT.upperBound()).lookupswitch(invalidState, stateSwitchCases);
         var start = cob.startLabel();
         var end = cob.newLabel();

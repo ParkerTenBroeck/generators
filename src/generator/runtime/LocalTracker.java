@@ -19,10 +19,13 @@ public class LocalTracker {
     HashMap<Label, StackMapFrameInfo> stackMapFrames = new HashMap<>();
     StackMapFrameInfo currentFrame;
     ArrayList<LocalStore> localStore = new ArrayList<>();
+    final int local_param_off;
 
 
-    LocalTracker(StateMachineBuilder smb, CodeModel com) {
+    LocalTracker(StateMachineBuilder smb, CodeModel com, int local_param_off) {
+        this.local_param_off = local_param_off;
         int offset = 0;
+
         for (var param : smb.params) {
             parameter_map.put(offset, param);
             offset += TypeKind.from(param).slotSize();
@@ -32,8 +35,9 @@ public class LocalTracker {
             var entries = new ArrayList<StackMapFrameInfo>();
             for (var smfi : attr.entries()) {
                 var locals = new ArrayList<>(smfi.locals());
-                for (int i = 0; i < smb.params.length; i++) locals.removeFirst();
-                locals.addFirst(StackMapFrameInfo.ObjectVerificationTypeInfo.of(smb.CD_this));
+                for (int i = 0; i < smb.params.length; i++)
+                    locals.removeFirst();
+//                locals.addFirst(StackMapFrameInfo.ObjectVerificationTypeInfo.of(smb.CD_this));
                 entries.add(StackMapFrameInfo.of(smfi.target(), locals, smfi.stack()));
                 stackMapFrames.put(smfi.target(), entries.getLast());
             }
@@ -60,8 +64,8 @@ public class LocalTracker {
                 name = StateMachineBuilder.LOCAL_PREFIX + localStore.size();
                 localStore.add(new LocalStore(name, desc));
             }
-            saved.add(new Saved(slot+1, name, desc));
-            cob.aload(0).loadLocal(tk, slot+1).putfield(cd, name, desc);
+            saved.add(new Saved(slot, name, desc));
+            cob.aload(0).loadLocal(tk, slot).putfield(cd, name, desc);
         });
         run.run();
 
@@ -97,8 +101,8 @@ public class LocalTracker {
     }
 
     public void currentLocals(LocalConsumer consumer) {
-        var slot = 0;
-        if (currentFrame != null && false)
+        var slot = local_param_off;
+        if (currentFrame != null) {
             for (var kind : currentFrame.locals()) {
                 switch (kind) {
                     case StackMapFrameInfo.ObjectVerificationTypeInfo o -> {
@@ -129,10 +133,13 @@ public class LocalTracker {
                     case StackMapFrameInfo.UninitializedVerificationTypeInfo _ -> throw new IllegalStateException();
                 }
             }
-//        for (var entry : localVarTypes.entrySet()) {
-//            if (entry.getKey() < slot) continue;
-//            ClassDesc cd = entry.getValue().upperBound();
-//            consumer.consume(entry.getKey(), TypeKind.from(cd), cd);
-//        }
+        }else{
+            for (var entry : localVarTypes.entrySet()) {
+                if (entry.getKey() < slot) continue;
+                ClassDesc cd = entry.getValue().upperBound();
+                consumer.consume(entry.getKey(), TypeKind.from(cd), cd);
+            }
+        }
+
     }
 }
