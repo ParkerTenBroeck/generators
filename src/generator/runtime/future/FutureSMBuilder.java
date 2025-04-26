@@ -1,5 +1,7 @@
 package generator.runtime.future;
 
+import generator.future.Future;
+import generator.future.Waker;
 import generator.gen.Gen;
 import generator.runtime.ReplacementKind;
 import generator.runtime.SpecialMethod;
@@ -14,13 +16,12 @@ import java.util.List;
 
 public class FutureSMBuilder extends StateMachineBuilder {
 
-    public final static ClassDesc CD_Gen = ClassDesc.ofDescriptor(Gen.class.descriptorString());
-    public final static ClassDesc CD_Res = ClassDesc.ofDescriptor(Gen.Res.class.descriptorString());
-    public final static ClassDesc CD_Yield = ClassDesc.ofDescriptor(Gen.Yield.class.descriptorString());
-    public final static ClassDesc CD_Ret = ClassDesc.ofDescriptor(Gen.Ret.class.descriptorString());
-    public final static MethodTypeDesc MTD_Res = MethodTypeDesc.of(CD_Res);
-    public final static MethodTypeDesc MTD_Gen_Obj = MethodTypeDesc.of(CD_Gen, ConstantDescs.CD_Object);
-    public final static MethodTypeDesc MTD_Gen = MethodTypeDesc.of(CD_Gen);
+    public final static ClassDesc CD_Future = ClassDesc.ofDescriptor(Future.class.descriptorString());
+    public final static ClassDesc CD_Waker = ClassDesc.ofDescriptor(Waker.class.descriptorString());
+    public final static ClassDesc CD_Pending = ClassDesc.ofDescriptor(Future.Pending.class.descriptorString());
+
+    public final static MethodTypeDesc MTD_Future_Obj = MethodTypeDesc.of(CD_Future, ConstantDescs.CD_Object);
+    public final static MethodTypeDesc MTD_Object_Waker = MethodTypeDesc.of(ConstantDescs.CD_Object, CD_Waker);
     public final static MethodTypeDesc MTD_Obj = MethodTypeDesc.of(ConstantDescs.CD_Object);
 
     static class AwaitHandler implements SpecialMethodHandler{
@@ -38,33 +39,76 @@ public class FutureSMBuilder extends StateMachineBuilder {
             cob.aload(0).loadConstant(yield_state).putfield(smb.CD_this, STATE_NAME, TypeKind.INT.upperBound());
             var start = cob.newBoundLabel();
             cob.dup().dup()
-                    .invokeinterface(CD_Gen, "next", MethodTypeDesc.of(CD_Res)).dup()
-                    .instanceOf(CD_Ret);
+                    .aload(1)
+                    .invokeinterface(CD_Future, "poll", MTD_Object_Waker).dup()
+                    .instanceOf(CD_Pending);
             cob.ifThenElse(bcb -> {
-                bcb.checkcast(CD_Ret).invokevirtual(CD_Ret, "v", MethodTypeDesc.of(ConstantDescs.CD_Object)).swap().pop();
-            }, bcb -> {
                 smb.lt.savingLocals(smb.CD_this, bcb, () -> {
-                    bcb.swap().loadLocal(TypeKind.from(smb.CD_this), 0).swap().putfield(smb.CD_this, "meow", CD_Gen);
+                    bcb.swap().aload(0).swap().putfield(smb.CD_this, "meow", CD_Future);
                     bcb.areturn().labelBinding(yield_label);
-                    bcb.loadLocal(TypeKind.from(smb.CD_this), 0).getfield(smb.CD_this, "meow", CD_Gen);
+                    bcb.aload(0).getfield(smb.CD_this, "meow", CD_Future);
                 });
                 bcb.goto_(start);
+            }, bcb -> {
+                bcb.swap().pop();
             });
 
         }
     }
 
+    static class YieldHandler implements SpecialMethodHandler {
+        final int resume_state;
+        final Label resume_label;
+
+        public YieldHandler(StateMachineBuilder smb, CodeBuilder cob) {
+            resume_state = smb.add_state(resume_label = cob.newLabel());
+        }
+
+        public ReplacementKind replacementKind(){return ReplacementKind.Immediate;}
+
+        @Override
+        public void handle(StateMachineBuilder smb, CodeBuilder cob) {
+
+            smb.lt.savingLocals(smb.CD_this, cob, () -> {
+                cob.aload(0).loadConstant(resume_state).putfield(smb.CD_this, STATE_NAME, TypeKind.INT.upperBound())
+                        .getstatic(CD_Pending, "INSTANCE", CD_Pending)
+                        .areturn();
+                cob.labelBinding(resume_label);
+            });
+        }
+    }
+
+    static class RetHandler implements SpecialMethodHandler{
+
+        public RetHandler() {}
+
+        public ReplacementKind replacementKind(){return ReplacementKind.ReplacingNextReturn;}
+
+        @Override
+        public void handle(StateMachineBuilder smb, CodeBuilder cob) {
+            cob.aload(0).loadConstant(-1).putfield(smb.CD_this, STATE_NAME, TypeKind.INT.upperBound()).areturn();
+        }
+    }
+
+    @Override
+    protected String uniqueName() {
+        return "Fut"+super.uniqueName();
+    }
+
     @Override
     protected void buildStateMachineMethod(ClassBuilder clb){
-        clb.withInterfaces(List.of(clb.constantPool().classEntry(CD_Gen)));
-        clb.withMethod("next", MethodTypeDesc.of(CD_Res), ClassFile.ACC_PUBLIC, mb -> mb.withCode(cob -> {
-            buildStateMachineMethodCode(clb, cob);
+        clb.withInterfaces(List.of(clb.constantPool().classEntry(CD_Future)));
+        clb.withMethod("poll", MTD_Object_Waker, ClassFile.ACC_PUBLIC, mb -> mb.withCode(cob -> {
+            cob.localVariable(1, "waker", CD_Waker, cob.startLabel(), cob.endLabel());
+            buildStateMachineMethodCode(clb, cob, 2);
         }));
-        clb.withField("meow", CD_Gen, ClassFile.ACC_PRIVATE);
+        clb.withField("meow", CD_Future, ClassFile.ACC_PRIVATE);
     }
 
     public FutureSMBuilder(ClassModel src_clm, MethodModel src_mem, CodeModel src_com) {
         super(src_clm, src_mem, src_com);
-        smmap.put(new SpecialMethod(CD_Gen, "await", MTD_Obj), AwaitHandler::new);
+        smmap.put(new SpecialMethod(CD_Future, "await", MTD_Obj), AwaitHandler::new);
+        smmap.put(new SpecialMethod(CD_Future, "ret", MTD_Future_Obj), (_, _) -> new RetHandler());
+        smmap.put(new SpecialMethod(CD_Future, "yield", ConstantDescs.MTD_void), YieldHandler::new);
     }
 }

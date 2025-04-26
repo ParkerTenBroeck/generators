@@ -82,10 +82,15 @@ public class GenSMBuilder extends StateMachineBuilder {
     }
 
     @Override
+    protected String uniqueName() {
+        return "Gen"+super.uniqueName();
+    }
+
+    @Override
     protected void buildStateMachineMethod(ClassBuilder clb){
         clb.withInterfaces(List.of(clb.constantPool().classEntry(CD_Gen)));
         clb.withMethod("next", MethodTypeDesc.of(CD_Res), ClassFile.ACC_PUBLIC, mb -> mb.withCode(cob -> {
-            buildStateMachineMethodCode(clb, cob);
+            buildStateMachineMethodCode(clb, cob, 1);
         }));
     }
 }

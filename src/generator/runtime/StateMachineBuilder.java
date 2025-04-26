@@ -36,7 +36,7 @@ public abstract class StateMachineBuilder {
 
     private final ArrayList<SwitchCase> stateSwitchCases = new ArrayList<>();
 
-    protected final String uniqueName(){
+    protected String uniqueName(){
         return sequence+++"";
     }
 
@@ -116,9 +116,9 @@ public abstract class StateMachineBuilder {
 
     protected abstract void buildStateMachineMethod(ClassBuilder clb);
 
-    public void buildStateMachineMethodCode(ClassBuilder clb, CodeBuilder cob){
+    public void buildStateMachineMethodCode(ClassBuilder clb, CodeBuilder cob, int loc_param_off){
         cob.trying(
-                tcob -> buildStateMachineCode(clb, tcob),
+                tcob -> buildStateMachineCode(clb, tcob, loc_param_off),
                 // catch anything set our state to -1 and throw the exception
                 ctb -> ctb.catchingAll(
                         blc ->
@@ -132,7 +132,7 @@ public abstract class StateMachineBuilder {
         ).aconst_null().areturn();
     }
 
-    public void buildStateMachineCode(ClassBuilder clb, CodeBuilder cob) {
+    public void buildStateMachineCode(ClassBuilder clb, CodeBuilder cob, int loc_param_off) {
         boolean ignore_next_pop = false;
 
         var invalidState = cob.newLabel();
@@ -187,25 +187,27 @@ public abstract class StateMachineBuilder {
                     continue;
                 }
             }
+            if(coe instanceof LocalVariable lv) System.out.println(lv);
 
             switch (coe) {
                 // locals which were once function parameters can be ignored
                 case LocalVariable lv when lv.slot() < paramSlotOff -> {
                 }
                 case LocalVariable lv ->
-                        cob.localVariable(lv.slot() - paramSlotOff + 1, lv.name(), lv.type(), lv.startScope(), lv.endScope());
+                        cob.localVariable(lv.slot() - paramSlotOff + loc_param_off, lv.name(), lv.type(), lv.startScope(), lv.endScope());
 
                 // increment indexes into the stack
                 case IncrementInstruction ii when ii.slot() < paramSlotOff ->
                         cob.aload(0).dup().getfield(CD_this, PARAM_PREFIX + ii.slot(), ConstantDescs.CD_int)
                                 .loadConstant(ii.constant()).iadd()
                                 .putfield(CD_this, PARAM_PREFIX + ii.slot(), ConstantDescs.CD_int);
-                case IncrementInstruction ii -> cob.iinc(ii.slot() - paramSlotOff + 1, ii.constant());
+                case IncrementInstruction ii -> cob.iinc(ii.slot() - paramSlotOff + loc_param_off, ii.constant());
 
                 // convert local function parameters to class fields and offset regular locals
                 case LoadInstruction li when li.slot() < paramSlotOff ->
                         cob.aload(0).getfield(CD_this, PARAM_PREFIX + li.slot(), lt.paramType(li.slot()));
-                case LoadInstruction li -> cob.loadLocal(li.typeKind(), li.slot() - paramSlotOff + 1);
+                case LoadInstruction li ->
+                        cob.loadLocal(li.typeKind(), li.slot() - paramSlotOff + loc_param_off);
 
                 // convert local function parameters to class fields and offset regular locals
                 case StoreInstruction ls when ls.slot() < paramSlotOff && ls.typeKind().slotSize() == 2 ->
@@ -213,8 +215,8 @@ public abstract class StateMachineBuilder {
                 case StoreInstruction ls when ls.slot() < paramSlotOff ->
                         cob.aload(0).swap().putfield(CD_this, PARAM_PREFIX + ls.slot(), lt.paramType(ls.slot()));
                 case StoreInstruction ls -> {
-                    lt.trackLocal(ls.slot() - paramSlotOff + 1, ls.typeKind());
-                    cob.storeLocal(ls.typeKind(), ls.slot() - paramSlotOff + 1);
+                    lt.trackLocal(ls.slot() - paramSlotOff + loc_param_off, ls.typeKind());
+                    cob.storeLocal(ls.typeKind(), ls.slot() - paramSlotOff + loc_param_off);
                 }
 
                 default -> cob.with(coe);

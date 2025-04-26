@@ -1,3 +1,4 @@
+import generator.future.Future;
 import generator.gen.Gen;
 
 public class Examples {
@@ -65,25 +66,22 @@ public class Examples {
 //        return Gen.ret();
 //    }
 
-    public static Gen<Void, String> awaitTest2(int number){
-        for(int i = 0; i < number; i ++)Gen.yield();
-        return Gen.ret(number+"");
-    }
+//    public static Future<String> awaitTest2(int number){
+//        for(int i = 0; i < number; i ++)Future.yield();
+//        return Future.ret(number+"");
+//    }
 
-    public static class Meow implements AutoCloseable{
-        {
-            System.out.println("Opened");
-        }
-        @Override
-        public void close() {
-            System.out.println("Closed");
-        }
-    }
-
-    public static Gen<Void, String> awaitTest(int number){
-        try(var m = new Meow()){
-            return Gen.ret(awaitTest2(number).await());
-        }
+    public static Future<String> awaitTest(int number){
+        int i = 0;
+//        Future.yield();
+//        i = 1;
+//        Future.yield();
+//        i += i*12;
+//        Future.yield();
+//        return Future.ret(awaitTest2(number).await());
+        for(; i < number; i++)
+            Future.yield();
+        return Future.ret("meow"+i);
     }
 
 //    public static Gen<Double, Void> test(double[] nyas){

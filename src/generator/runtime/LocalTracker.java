@@ -60,8 +60,8 @@ public class LocalTracker {
                 name = StateMachineBuilder.LOCAL_PREFIX + localStore.size();
                 localStore.add(new LocalStore(name, desc));
             }
-            saved.add(new Saved(slot, name, desc));
-            cob.aload(0).loadLocal(tk, slot).putfield(cd, name, desc);
+            saved.add(new Saved(slot+1, name, desc));
+            cob.aload(0).loadLocal(tk, slot+1).putfield(cd, name, desc);
         });
         run.run();
 
@@ -98,7 +98,7 @@ public class LocalTracker {
 
     public void currentLocals(LocalConsumer consumer) {
         var slot = 0;
-        if (currentFrame != null)
+        if (currentFrame != null && false)
             for (var kind : currentFrame.locals()) {
                 switch (kind) {
                     case StackMapFrameInfo.ObjectVerificationTypeInfo o -> {
@@ -129,10 +129,10 @@ public class LocalTracker {
                     case StackMapFrameInfo.UninitializedVerificationTypeInfo _ -> throw new IllegalStateException();
                 }
             }
-        for (var entry : localVarTypes.entrySet()) {
-            if (entry.getKey() < slot) continue;
-            ClassDesc cd = entry.getValue().upperBound();
-            consumer.consume(entry.getKey(), TypeKind.from(cd), cd);
-        }
+//        for (var entry : localVarTypes.entrySet()) {
+//            if (entry.getKey() < slot) continue;
+//            ClassDesc cd = entry.getValue().upperBound();
+//            consumer.consume(entry.getKey(), TypeKind.from(cd), cd);
+//        }
     }
 }
