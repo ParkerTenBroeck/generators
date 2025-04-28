@@ -121,10 +121,6 @@ public abstract class StateMachineBuilder {
                 ctb -> ctb.catchingAll(
                         blc ->
                                 blc.aload(0).loadConstant(-1).putfield(CD_this, STATE_NAME, ConstantDescs.CD_int)
-                                        .new_(ClassDesc.ofDescriptor(RuntimeException.class.descriptorString()))
-                                        .dup_x1()
-                                        .swap()
-                                        .invokespecial(ClassDesc.ofDescriptor(RuntimeException.class.descriptorString()), ConstantDescs.INIT_NAME, MethodTypeDesc.of(ConstantDescs.CD_void, ConstantDescs.CD_Throwable))
                                         .athrow()
                 )
         ).aconst_null().areturn();
@@ -133,6 +129,8 @@ public abstract class StateMachineBuilder {
     public void buildStateMachineCode(ClassBuilder clb, CodeBuilder cob, int loc_param_off) {
         boolean ignore_next_pop = false;
 
+        System.out.println();
+        System.out.println("Begin");
         this.lt = new LocalTracker(this, src_com, loc_param_off);
 
         var invalidState = cob.newLabel();
@@ -172,9 +170,6 @@ public abstract class StateMachineBuilder {
                     }
                 }
             }
-            if (coe instanceof Label l) {
-                lt.encounterLabel(l);
-            }
             if (coe instanceof InvokeInstruction is){
                 if(smmap.get(new SpecialMethod(is.owner().asSymbol(), is.name().stringValue(), is.typeSymbol())) != null){
                     if(currentHandler!=null)throw new RuntimeException("Multiple method handlers at once not supported");
@@ -189,7 +184,9 @@ public abstract class StateMachineBuilder {
                     continue;
                 }
             }
-            if(coe instanceof LocalVariable lv) System.out.println(lv);
+
+            lt.encounter(coe);
+
 
             switch (coe) {
                 // locals which were once function parameters can be ignored
@@ -216,10 +213,8 @@ public abstract class StateMachineBuilder {
                         cob.aload(0).dup_x2().pop().putfield(CD_this, PARAM_PREFIX + ls.slot(), lt.paramType(ls.slot()));
                 case StoreInstruction ls when ls.slot() < paramSlotOff ->
                         cob.aload(0).swap().putfield(CD_this, PARAM_PREFIX + ls.slot(), lt.paramType(ls.slot()));
-                case StoreInstruction ls -> {
-                    lt.trackLocal(ls.slot() - paramSlotOff + loc_param_off, ls.typeKind());
-                    cob.storeLocal(ls.typeKind(), ls.slot() - paramSlotOff + loc_param_off);
-                }
+                case StoreInstruction ls ->
+                        cob.storeLocal(ls.typeKind(), ls.slot() - paramSlotOff + loc_param_off);
 
                 default -> cob.with(coe);
             }

@@ -10,6 +10,8 @@ public interface Future<R> {
         throw new RuntimeException("NO!");
     }
 
+    default void cancel(){}
+
     static <R> Future<R> ret(R r){
         throw new RuntimeException("NO!");
     }

@@ -70,21 +70,34 @@ public class Examples {
 //    }
 
     public static class Delay implements Future<String>{
-
-        private final int delay;
+        private final static Timer timer;
+        static{
+            timer = new Timer(true);
+        }
+        private int delay;
         private boolean ready;
         public Delay(int ms){
+            if(ms<0)throw new IllegalArgumentException("Delay cannot be negative");
             delay = ms;
         }
         @Override
-        public Object poll(Waker waker) {
-            new Timer().schedule(new TimerTask() {
-                @Override
-                public void run() {
-                    ready = true;
-                    waker.wake();
-                }
-            }, delay);
+        public synchronized Object poll(Waker waker) {
+            if(delay==0){
+                ready=true;
+                delay=-1;
+                return null;
+            }
+            if(delay != -1){
+                timer.schedule(new TimerTask() {
+                    @Override
+                    public void run() {
+                        ready = true;
+                        waker.wake();
+                    }
+                }, delay);
+                delay = -1;
+            }
+
             if(ready)return null;
             return Pending.INSTANCE;
         }
@@ -96,8 +109,21 @@ public class Examples {
     }
 
     public Future<String> awaitTest(int number){
-        var result = awaitTest2(number).await();
-        return Future.ret("Result: " + result);
+        try(var m = new Meow()){
+            var result = awaitTest2(number).await();
+            return Future.ret("Result: " + result);
+        }
+    }
+
+    public static class Meow implements AutoCloseable{
+        {
+            System.out.println("OPen");
+        }
+
+        @Override
+        public void close() {
+            System.out.println("Close");
+        }
     }
 
 //    public static Gen<Double, Void> test(double[] nyas){
