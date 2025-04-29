@@ -1,8 +1,6 @@
+import async_example.Delay;
+import async_example.Jokio;
 import generator.future.Future;
-import generator.future.Waker;
-
-import java.util.Timer;
-import java.util.TimerTask;
 
 public class Examples {
     //    public static Gen<String, Void> parse(String str){
@@ -69,49 +67,24 @@ public class Examples {
 //        return Gen.ret();
 //    }
 
-    public static class Delay implements Future<String>{
-        private final static Timer timer;
-        static{
-            timer = new Timer(true);
-        }
-        private int delay;
-        private boolean ready;
-        public Delay(int ms){
-            if(ms<0)throw new IllegalArgumentException("Delay cannot be negative");
-            delay = ms;
-        }
-        @Override
-        public synchronized Object poll(Waker waker) {
-            if(delay==0){
-                ready=true;
-                delay=-1;
-                return null;
-            }
-            if(delay != -1){
-                timer.schedule(new TimerTask() {
-                    @Override
-                    public void run() {
-                        ready = true;
-                        waker.wake();
-                    }
-                }, delay);
-                delay = -1;
-            }
-
-            if(ready)return null;
-            return Pending.INSTANCE;
-        }
-    }
-
     public static Future<String> awaitTest2(int number){
         ((Future<?>)new Delay(number)).await();
         return Future.ret(number+"ms");
     }
 
     public Future<String> awaitTest(int number){
+        var result = awaitTest2(number).await();
+        var rt = Jokio.runtime().await();
+        rt.spawn(awaitTest2(5000));
+//        closing(100);
+//        closing(10).await();
+        return Future.ret("Result: " + result);
+    }
+
+    public Future<String> closing(int number){
         try(var m = new Meow()){
             var result = awaitTest2(number).await();
-            return Future.ret("Result: " + result);
+            return Future.ret(result);
         }
     }
 

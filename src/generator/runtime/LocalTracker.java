@@ -146,6 +146,7 @@ public class LocalTracker {
                 case ITEM_FLOAT -> CD_float;
                 case ITEM_DOUBLE -> CD_double;
                 case ITEM_OBJECT -> sym;
+                case ITEM_NULL -> CD_Object;
                 default -> throw new RuntimeException();
             };
         }
@@ -433,7 +434,7 @@ public class LocalTracker {
 
                     case TableSwitchInstruction ts -> popStack();
                     case ThrowInstruction t -> popStack();
-                    case TypeCheckInstruction tc -> {}
+                    case TypeCheckInstruction tc -> decStack(1).pushStack(tc.type().asSymbol());
                     case DiscontinuedInstruction d -> throw new IllegalStateException(d.toString());
                     default -> throw new IllegalStateException();
                 }

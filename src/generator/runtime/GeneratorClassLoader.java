@@ -60,7 +60,7 @@ public class GeneratorClassLoader extends ClassLoader {
         clm.findAttributes(Attributes.nestMembers()).forEach(i -> nestMem.addAll(i.nestMembers().stream().map(ClassEntry::asSymbol).toList()));
         clm.findAttributes(Attributes.innerClasses()).forEach(i -> innerCl.addAll(i.classes()));
 
-        return ClassFile.of(ClassFile.AttributesProcessingOption.PASS_ALL_ATTRIBUTES).build(clm.thisClass().asSymbol(), cb -> {
+        return ClassFile.of(ClassFile.AttributesProcessingOption.PASS_ALL_ATTRIBUTES, ClassFile.StackMapsOption.STACK_MAPS_WHEN_REQUIRED).build(clm.thisClass().asSymbol(), cb -> {
             for (var ce : clm) {
                 if (ce instanceof MethodModel mem && !isGen && !isFuture) {
                     StateMachineBuilder builder = null;
@@ -104,6 +104,10 @@ public class GeneratorClassLoader extends ClassLoader {
         var smb = new FutureSMBuilder(src_clm, src_mem, com);
         try{
             add(smb.CD_this.displayName(), smb.buildStateMachine());
+
+            cb.withMethod(src_mem.methodName(), src_mem.methodType(), src_mem.flags().flagsMask(), mb -> {
+                mb.withCode(smb::buildSourceMethodShim);
+            });
         }catch (Exception e){
             e.printStackTrace();
             cb.withMethod(src_mem.methodName(), src_mem.methodType(), src_mem.flags().flagsMask(), mb -> {
@@ -111,9 +115,6 @@ public class GeneratorClassLoader extends ClassLoader {
             });
             return smb;
         }
-        cb.withMethod(src_mem.methodName(), src_mem.methodType(), src_mem.flags().flagsMask(), mb -> {
-            mb.withCode(smb::buildSourceMethodShim);
-        });
         return smb;
     }
 }

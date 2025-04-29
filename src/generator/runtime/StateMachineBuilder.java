@@ -58,7 +58,7 @@ public abstract class StateMachineBuilder {
         if (!src_mem.flags().has(AccessFlag.STATIC)) {
             mts = mts.insertParameterTypes(0, src_clm.thisClass().asSymbol());
         }
-        var name = src_clm.thisClass().name().stringValue() + "$" + src_mem.methodName().stringValue() + "$" + uniqueName();
+        var name = src_clm.thisClass().asSymbol().displayName() + "$" + src_mem.methodName().stringValue() + "$" + uniqueName();
 
         this.CD_this = ClassDesc.of(src_clm.thisClass().asSymbol().packageName(), name);
         this.params = mts.parameterArray();
@@ -84,7 +84,7 @@ public abstract class StateMachineBuilder {
     }
 
     public byte[] buildStateMachine(){
-        return ClassFile.of(ClassFile.StackMapsOption.STACK_MAPS_WHEN_REQUIRED, ClassFile.AttributesProcessingOption.PASS_ALL_ATTRIBUTES).build(CD_this, clb -> {
+        return ClassFile.of(ClassFile.AttributesProcessingOption.PASS_ALL_ATTRIBUTES).build(CD_this, clb -> {
 
             if(shouldBeInnerClass()){
                 src_clm.findAttributes(Attributes.sourceFile()).forEach(clb::with);
@@ -145,8 +145,8 @@ public abstract class StateMachineBuilder {
                     handlers.add(handler.apply(this, cob));
             }
         }
-//        if(handlers.isEmpty() && stateSwitchCases.isEmpty())
-//            throw new RuntimeException("Not a state machine");
+        if(handlers.isEmpty())
+            throw new RuntimeException("Not a state machine");
         cob.aload(0).getfield(CD_this, STATE_NAME, TypeKind.INT.upperBound()).lookupswitch(invalidState, stateSwitchCases);
         var start = cob.startLabel();
         var end = cob.newLabel();
