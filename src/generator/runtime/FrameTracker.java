@@ -11,13 +11,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Objects;
 
-import static generator.runtime.StateMachineBuilder.LOCAL_PREFIX;
 import static java.lang.constant.ConstantDescs.*;
 
-public class LocalTracker {
-
-    record LocalStore(String name, ClassDesc cd) {
-    }
+public class FrameTracker {
 
     private static final int ITEM_TOP = 0,
             ITEM_INTEGER = 1,
@@ -35,7 +31,14 @@ public class LocalTracker {
             ITEM_LONG_2ND = 13,
             ITEM_DOUBLE_2ND = 14;
 
-    private static record Type(int tag, ClassDesc sym, int bci) {
+    public Type[] locals() {
+        return locals.toArray(Type[]::new);
+    }
+    public Type[] stack() {
+        return stack.toArray(Type[]::new);
+    }
+
+    public record Type(int tag, ClassDesc sym, int bci) {
 
         //singleton types
         static final Type TOP_TYPE = simpleType(ITEM_TOP),
@@ -191,27 +194,19 @@ public class LocalTracker {
 
     final ArrayList<Type> stack = new ArrayList<>();
     final ArrayList<Type> locals = new ArrayList<>();
-//    HashMap<Integer, TypeKind> localVarTypes = new HashMap<>();
-//    StackMapFrameInfo currentFrame;
 
-    HashMap<Integer, ClassDesc> parameter_map = new HashMap<>();
     HashMap<Label, StackMapFrameInfo> stackMapFrames = new HashMap<>();
-    ArrayList<LocalStore> localStore = new ArrayList<>();
-    
-    final int local_param_off;
+
     final StateMachineBuilder smb;
 
 
-    LocalTracker(StateMachineBuilder smb, CodeModel com, int local_param_off) {
-        this.local_param_off = local_param_off;
+    FrameTracker(StateMachineBuilder smb, CodeModel com) {
         this.smb = smb;
         int offset = 0;
 
 
 
         for (var param : smb.params) {
-            parameter_map.put(offset, param);
-
             if(param == CD_long){
                 setLocal2(offset, Type.DOUBLE_TYPE, Type.DOUBLE2_TYPE);
             }else if(param == CD_double){
@@ -246,7 +241,7 @@ public class LocalTracker {
         }
     }
 
-    LocalTracker pushStack(ClassDesc desc) {
+    FrameTracker pushStack(ClassDesc desc) {
         if (desc == CD_long)   return pushStack(Type.LONG_TYPE, Type.LONG2_TYPE);
         if (desc == CD_double) return pushStack(Type.DOUBLE_TYPE, Type.DOUBLE2_TYPE);
         return desc == CD_void ? this
@@ -256,12 +251,12 @@ public class LocalTracker {
                         : Type.referenceType(desc));
     }
 
-    LocalTracker pushStack(Type type) {
+    FrameTracker pushStack(Type type) {
         stack.add(type);
         return this;
     }
 
-    LocalTracker pushStack(Type type1, Type type2) {
+    FrameTracker pushStack(Type type1, Type type2) {
         stack.add(type1);
         stack.add(type2);
         return this;
@@ -271,7 +266,7 @@ public class LocalTracker {
         return stack.removeLast();
     }
 
-    LocalTracker decStack(int size) {
+    FrameTracker decStack(int size) {
         for(int i = 0; i < size; i ++)stack.removeLast();
         return this;
     }
@@ -445,34 +440,6 @@ public class LocalTracker {
             case CustomAttribute<?> _ -> {}
             case StackMapTableAttribute _ -> {}
         }
-        if(ce instanceof Instruction)
-            System.out.println("loc: " + locals + " stack: " + stack);
-    }
-
-
-    //Tries its best to reuse old saved locals field slots, only reuses if types exactly match
-    public void savingLocals(ClassDesc cd, CodeBuilder cob, Runnable run) {
-        record Saved(int slot, String name, ClassDesc cd) {
-        }
-
-        var saved = new ArrayList<Saved>();
-        currentLocals((slot, tk, desc) -> {
-            String name = LOCAL_PREFIX + localStore.size();
-            localStore.add(new LocalStore(name, desc));
-            saved.add(new Saved(slot, name, desc));
-            cob.aload(0).loadLocal(tk, slot).putfield(cd, name, desc);
-        });
-        run.run();
-
-        for (var save : saved) {
-            cob.aload(0).getfield(cd, save.name, save.cd).storeLocal(TypeKind.from(save.cd), save.slot);
-        }
-    }
-
-    public void createLocalStoreFields(ClassBuilder clb) {
-        for (var local : localStore) {
-            clb.withField(local.name, local.cd, ClassFile.ACC_PRIVATE);
-        }
     }
 
     public void encounterLabel(Label l) {
@@ -485,24 +452,5 @@ public class LocalTracker {
             for( var local : tmp.locals())
                 locals.add(Type.verificationType(local));
         }
-    }
-
-    public ClassDesc paramType(int slot) {
-        return parameter_map.get(slot);
-    }
-
-    public interface LocalConsumer {
-        void consume(int slot, TypeKind tk, ClassDesc desc);
-    }
-
-    public void currentLocals(LocalConsumer consumer) {
-        int slot = 0;
-        for (var entry : locals) {
-            slot++;
-            if (slot <= local_param_off) continue;
-            if(entry.isCategory2_2nd())continue;
-            consumer.consume(slot - smb.paramSlotOff + local_param_off - 1, TypeKind.from(entry.toCD()), entry.toCD());
-        }
-
     }
 }

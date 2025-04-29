@@ -63,11 +63,19 @@ public class GeneratorClassLoader extends ClassLoader {
         return ClassFile.of(ClassFile.AttributesProcessingOption.PASS_ALL_ATTRIBUTES, ClassFile.StackMapsOption.STACK_MAPS_WHEN_REQUIRED).build(clm.thisClass().asSymbol(), cb -> {
             for (var ce : clm) {
                 if (ce instanceof MethodModel mem && !isGen && !isFuture) {
-                    StateMachineBuilder builder = null;
+                    StateMachineBuilder builder;
                     if(mem.methodTypeSymbol().returnType().descriptorString().equals(Gen.class.descriptorString())){
-                        builder = generatorMethod(cb, mem, clm);
+                        builder = new GenSMBuilder(clm, mem, mem.code().get());
                     }else if(mem.methodTypeSymbol().returnType().descriptorString().equals(Future.class.descriptorString())){
-                        builder = futureMethod(cb, mem, clm);
+                        builder = new FutureSMBuilder(clm, mem, mem.code().get());
+                    }else{
+                        builder= null;
+                    }
+                    if(builder!=null&&builder.hasAnyHandlers()){
+                        add(builder.CD_this.displayName(), builder.buildStateMachine());
+                        cb.withMethod(mem.methodName(), mem.methodType(), mem.flags().flagsMask(), mb -> {
+                            mb.withCode(builder::buildSourceMethodShim);
+                        });
                     }else{
                         cb.with(mem);
                     }
@@ -87,34 +95,5 @@ public class GeneratorClassLoader extends ClassLoader {
             if(!nestMem.isEmpty())
                 cb.with(NestMembersAttribute.ofSymbols(nestMem));
         });
-    }
-
-    private StateMachineBuilder generatorMethod(ClassBuilder cb, MethodModel src_mem, ClassModel src_clm) {
-        var com = src_mem.code().get();
-        var smb = new GenSMBuilder(src_clm, src_mem, com);
-        add(smb.CD_this.displayName(), smb.buildStateMachine());
-        cb.withMethod(src_mem.methodName(), src_mem.methodType(), src_mem.flags().flagsMask(), mb -> {
-            mb.withCode(smb::buildSourceMethodShim);
-        });
-        return smb;
-    }
-
-    private StateMachineBuilder futureMethod(ClassBuilder cb, MethodModel src_mem, ClassModel src_clm) {
-        var com = src_mem.code().get();
-        var smb = new FutureSMBuilder(src_clm, src_mem, com);
-        try{
-            add(smb.CD_this.displayName(), smb.buildStateMachine());
-
-            cb.withMethod(src_mem.methodName(), src_mem.methodType(), src_mem.flags().flagsMask(), mb -> {
-                mb.withCode(smb::buildSourceMethodShim);
-            });
-        }catch (Exception e){
-            e.printStackTrace();
-            cb.withMethod(src_mem.methodName(), src_mem.methodType(), src_mem.flags().flagsMask(), mb -> {
-                mb.with(com);
-            });
-            return smb;
-        }
-        return smb;
     }
 }

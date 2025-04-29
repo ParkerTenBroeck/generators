@@ -1,6 +1,9 @@
 import async_example.Delay;
 import async_example.Jokio;
+import async_example.Socket;
 import generator.future.Future;
+
+import java.net.InetSocketAddress;
 
 public class Examples {
     //    public static Gen<String, Void> parse(String str){
@@ -76,8 +79,8 @@ public class Examples {
         var result = awaitTest2(number).await();
         var rt = Jokio.runtime().await();
         rt.spawn(awaitTest2(5000));
-//        closing(100);
-//        closing(10).await();
+
+        closing(5000).await();
         return Future.ret("Result: " + result);
     }
 
