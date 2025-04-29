@@ -45,9 +45,13 @@ public class FutureSMBuilder extends StateMachineBuilder {
             cob.ifThenElse(bcb -> {
                 bcb.swap().aload(0).swap().putfield(smb.CD_this, AWAITING_FIELD_NAME, CD_Future);
 
-                var saved = frame.save(smb, cob, 2, 0);
+                var sst = new SavedStateTracker();
+                frame.save_locals(smb, cob, sst,2);
+                bcb.storeLocal(TypeKind.REFERENCE, 2);
+                frame.save_stack(smb, cob, sst,1);
+                bcb.loadLocal(TypeKind.REFERENCE, 2);
                 bcb.areturn().labelBinding(restore_label);
-                saved.restore_all(smb, cob);
+                sst.restore_all(smb, cob);
 
                 bcb.aload(0).getfield(smb.CD_this, AWAITING_FIELD_NAME, CD_Future);
                 bcb.aload(0).aconst_null().putfield(smb.CD_this, AWAITING_FIELD_NAME, CD_Future);
@@ -75,8 +79,25 @@ public class FutureSMBuilder extends StateMachineBuilder {
             var saved = frame.save(smb, cob, 2, 0);
             cob.aload(0).loadConstant(resume_state).putfield(smb.CD_this, STATE_NAME, TypeKind.INT.upperBound())
                         .getstatic(CD_Pending, "INSTANCE", CD_Pending)
-                        .areturn();
+                        .areturn().labelBinding(resume_label);
             saved.restore_all(smb, cob);
+        }
+    }
+
+    static class WakerHandler extends SpecialMethodHandler{
+
+        protected WakerHandler(StateMachineBuilder smb, CodeBuilder cob) {
+            super(smb, cob);
+        }
+
+        @Override
+        public void buildHandler(StateMachineBuilder smb, CodeBuilder cob, Frame frame) {
+            cob.aload(1);
+        }
+
+        @Override
+        public ReplacementKind replacementKind() {
+            return ReplacementKind.Immediate;
         }
     }
 
@@ -122,5 +143,6 @@ public class FutureSMBuilder extends StateMachineBuilder {
         smmap.put(new SpecialMethod(CD_Future, "await", MTD_Obj), AwaitHandler::new);
         smmap.put(new SpecialMethod(CD_Future, "ret", MTD_Future_Obj), RetHandler::new);
         smmap.put(new SpecialMethod(CD_Future, "yield", ConstantDescs.MTD_void), YieldHandler::new);
+        smmap.put(new SpecialMethod(CD_Waker, "waker", MethodTypeDesc.of(CD_Waker)), WakerHandler::new);
     }
 }

@@ -19,9 +19,9 @@ public class SavedStateTracker {
         smb.lstate.add(new StateMachineBuilder.LState(name, desc));
 
         if(TypeKind.from(desc).slotSize()==2){
-            cob.aload(0).swap().putfield(smb.CD_this, name, desc);
-        }else{
             cob.aload(0).dup_x2().pop().putfield(smb.CD_this, name, desc);
+        }else{
+            cob.aload(0).swap().putfield(smb.CD_this, name, desc);
         }
 
         var s = new StackState(name, desc);

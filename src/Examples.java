@@ -2,6 +2,7 @@ import async_example.Delay;
 import async_example.Jokio;
 import async_example.Socket;
 import generator.future.Future;
+import generator.future.Waker;
 
 import java.net.InetSocketAddress;
 
@@ -75,13 +76,17 @@ public class Examples {
         return Future.ret(number+"ms");
     }
 
-    public Future<String> awaitTest(int number){
-        var result = awaitTest2(number).await();
-        var rt = Jokio.runtime().await();
-        rt.spawn(awaitTest2(5000));
 
-        closing(5000).await();
-        return Future.ret("Result: " + result);
+    public Future<Integer> number(int value){
+        Waker.waker().wake();
+        Future.yield();
+        return Future.ret(value);
+    }
+
+    public Future<String> awaitTest(int number){
+        var result = number(10).await()+number(20).await();
+        Jokio.runtime().await().spawn(awaitTest2(5000));
+        return Future.ret(""+result);
     }
 
     public Future<String> closing(int number){
