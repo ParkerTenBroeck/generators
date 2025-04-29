@@ -2,6 +2,7 @@ package generator.runtime;
 
 import java.lang.classfile.CodeBuilder;
 import java.lang.classfile.TypeKind;
+import java.lang.constant.ConstantDescs;
 import java.util.Arrays;
 
 public record Frame(FrameTracker.Type[] locals, FrameTracker.Type[] stack) {
@@ -16,6 +17,7 @@ public record Frame(FrameTracker.Type[] locals, FrameTracker.Type[] stack) {
         for (var entry : locals) {
             slot++;
             if (slot <= loc_off) continue;
+
             if (entry.isCategory2_2nd()) continue;
 
             sst.save_local(smb, cob, entry.toCD(), slot - smb.paramSlotOff + loc_off - 1);

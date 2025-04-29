@@ -7,7 +7,11 @@ import java.lang.classfile.attribute.StackMapFrameInfo;
 import java.lang.classfile.attribute.StackMapTableAttribute;
 import java.lang.classfile.instruction.*;
 import java.lang.constant.ClassDesc;
+import java.lang.constant.DynamicConstantDesc;
+import java.lang.constant.MethodHandleDesc;
+import java.lang.constant.MethodTypeDesc;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Objects;
 
@@ -310,10 +314,29 @@ public class FrameTracker {
                     case BranchInstruction b when b.opcode() == Opcode.GOTO || b.opcode() == Opcode.GOTO_W -> {}
                     case BranchInstruction b -> popStack();
                     case ConstantInstruction c when ins.opcode() == Opcode.ACONST_NULL -> pushStack(Type.NULL_TYPE);
-                    case ConstantInstruction c -> pushStack(c.typeKind().upperBound());
+                    case ConstantInstruction c -> {
+                        switch(c.constantValue()){
+                            case Double _ -> pushStack(Type.DOUBLE_TYPE);
+                            case Float _ -> pushStack(Type.FLOAT_TYPE);
+                            case Integer _ -> pushStack(Type.INTEGER_TYPE);
+                            case Long _ -> pushStack(Type.LONG_TYPE);
+                            case String _ -> pushStack(Type.STRING_TYPE);
+                            case ClassDesc desc -> pushStack(desc);
+                            case DynamicConstantDesc dynamicConstantDesc -> pushStack(dynamicConstantDesc.constantType());
+                            case MethodHandleDesc methodHandleDesc ->
+                                throw new RuntimeException();
+                            case MethodTypeDesc methodTypeDesc ->
+                                    throw new RuntimeException();
+                        }
+                    }
                     case ConvertInstruction c -> decStack(c.fromType().slotSize()).pushStack(c.toType().upperBound());
                     case FieldInstruction f -> {
-
+                        switch(f.opcode()){
+                            case GETFIELD -> decStack(1).pushStack(f.typeSymbol());
+                            case GETSTATIC -> pushStack(f.typeSymbol());
+                            case PUTFIELD -> decStack(1 + TypeKind.from(f.typeSymbol()).slotSize());
+                            case PUTSTATIC -> decStack(TypeKind.from(f.typeSymbol()).slotSize());
+                        }
                     }
                     case IncrementInstruction i -> {}
                     case InvokeDynamicInstruction i -> {
@@ -334,6 +357,9 @@ public class FrameTracker {
                     case InvokeInstruction i -> {
                         for(var param : i.typeSymbol().parameterArray())
                             decStack(TypeKind.from(param).slotSize());
+                        if(stack.isEmpty()){
+                            System.out.println(Arrays.toString(i.typeSymbol().parameterArray()));
+                        }
                         popStack();
                         pushStack(i.typeSymbol().returnType());
                     }
@@ -449,8 +475,16 @@ public class FrameTracker {
             locals.clear();
             for( var sl : tmp.stack())
                 pushStack(Type.verificationType(sl));
-            for( var local : tmp.locals())
-                locals.add(Type.verificationType(local));
+
+            for( var sl : tmp.locals())
+                locals.add(Type.verificationType(sl));
+
+//            while(locals.size()>tmp.locals().size())locals.removeLast();
+//            while(locals.size()<tmp.locals().size())locals.add(null);
+//            int slot = 0;
+//            for( var local : tmp.locals()){
+//                locals.set(slot, Type.verificationType(local));
+//            }
         }
     }
 }

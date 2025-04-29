@@ -1,10 +1,11 @@
 import async_example.Delay;
-import async_example.Jokio;
 import async_example.Socket;
 import generator.future.Future;
 import generator.future.Waker;
 
 import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 
 public class Examples {
     //    public static Gen<String, Void> parse(String str){
@@ -83,10 +84,29 @@ public class Examples {
         return Future.ret(value);
     }
 
+    public Future<Void> send(ByteBuffer buffer, Socket socket){
+        String message = "hello world!\n";
+        buffer.limit(message.length()).put(message.getBytes(StandardCharsets.UTF_8)).position(0);
+        var wrote = socket.write_all(buffer).await();
+        buffer.clear().limit(wrote);
+        var read = socket.read_all(buffer).await();
+        System.out.println(new String(buffer.array(), 0, read));
+
+        return Future.ret(null);
+    }
+
     public Future<String> awaitTest(int number){
-        var result = number(10).await()+number(20).await();
-        Jokio.runtime().await().spawn(awaitTest2(5000));
-        return Future.ret(""+result);
+//        var result = number(10).await()+number(20).await();
+//        Jokio.runtime().await().spawn(awaitTest2(5000));
+
+        var buffer = ByteBuffer.allocate(500);
+        try(var socket = Socket.connect(new InetSocketAddress("45.79.112.203", 4242)).await()){
+           send(buffer, socket).await();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+
+        return Future.ret("");
     }
 
     public Future<String> closing(int number){

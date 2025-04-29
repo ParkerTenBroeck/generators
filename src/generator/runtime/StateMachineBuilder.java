@@ -70,18 +70,17 @@ public abstract class StateMachineBuilder {
         this.paramSlotOff = Arrays.stream(params).mapToInt(p -> TypeKind.from(p).slotSize()).sum();
 
 
+        System.out.println("FRAME");
         var lt = new FrameTracker(this, src_com);
         for(var coe : src_com){
-            if(coe instanceof Instruction)
+            if(coe instanceof Instruction) {
                 frames.add(new Frame(lt.locals(), lt.stack()));
+                System.out.println(frames.getLast() + " " + coe);
+            }
             lt.encounter(coe);
+
         }
         frames.add(new Frame(lt.locals(), lt.stack()));
-
-        for(var wf : with_frames()){
-            if(wf.coe instanceof Instruction)
-                System.out.println(wf.coe() + " " + wf.frame());
-        }
     }
 
     public record WithFrame(CodeElement coe, Frame frame){}

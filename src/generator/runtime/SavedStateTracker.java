@@ -25,7 +25,7 @@ public class SavedStateTracker {
         }
 
         var s = new StackState(name, desc);
-        saved.addLast(s);
+        saved.add(s);
         return s;
     }
 
@@ -53,6 +53,6 @@ public class SavedStateTracker {
 
     public void restore_all(StateMachineBuilder smb, CodeBuilder cob) {
         while(!saved.isEmpty())
-            restore(smb, cob, saved.getFirst());
+            restore(smb, cob, saved.getLast());
     }
 }
