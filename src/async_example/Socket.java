@@ -42,7 +42,6 @@ public class Socket implements AutoCloseable{
                         var c = (SocketChannel)key.channel();
                         var w = (Waker)key.attachment();
 
-                        System.out.println(key);
                         if (!key.isValid()) {
                         }
                         if(key.isAcceptable()){

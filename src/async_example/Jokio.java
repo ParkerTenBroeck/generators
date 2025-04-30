@@ -38,6 +38,10 @@ public class Jokio implements Runnable{
         };
     }
 
+    public static Jokio runtime(Waker waker){
+        return ((Task<?>)waker).runtime();
+    }
+
     private final HashSet<Task<?>> current = new HashSet<>();
     private final Queue<Task<?>> woke = new ArrayDeque<>();
 

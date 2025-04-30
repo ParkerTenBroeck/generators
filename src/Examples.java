@@ -1,4 +1,4 @@
-import async_example.Delay;
+import async_example.Jokio;
 import async_example.Socket;
 import generator.future.Future;
 import generator.future.Waker;
@@ -84,39 +84,30 @@ public class Examples {
 //        return Future.ret(value);
 //    }
 
-//    public static Future<Void> send(ByteBuffer buffer, Socket socket){
-//        String message = "hello world!\n";
-//        buffer.limit(message.length()).put(message.getBytes(StandardCharsets.UTF_8)).position(0);
-//        var wrote = socket.write_all(buffer).await();
-//        buffer.clear().limit(wrote);
-//        var read = socket.read_all(buffer).await();
-//        System.out.println(new String(buffer.array(), 0, read));
-//
-//        return Future.ret(null);
-//    }
 
-    public static Future<Void> forever(Socket socket){
-        var buffer = ByteBuffer.allocate(500);
-        while(true){
-//            send(buffer, socket).await();
-            ((Future<?>)new Delay(1000 + buffer.get())).await();
-            System.out.println(socket);
+    public static Future<Void> test(){
+        for(int i = 0; i < 1000; i ++){
+            Jokio.runtime(Waker.waker()).spawn(echoForever("Message " + i + "\n"));
         }
+        return Future.ret(null);
     }
 
-//    public Future<String> awaitTest(int number){
-////        var result = number(10).await()+number(20).await();
-////        Jokio.runtime().await().spawn(awaitTest2(5000));
-//
-//        try(var socket = Socket.connect(new InetSocketAddress("45.79.112.203", 4242)).await()){
-//            forever(socket).await();
-//        } catch (Exception e) {
-//            e.printStackTrace();
-////            throw new RuntimeException(e);
-//        }
-//
-//        return Future.ret("");
-//    }
+    public static Future<Void> echoForever(String message){
+        try(var socket = Socket.connect(new InetSocketAddress("45.79.112.203", 4242)).await()){
+            var buffer = ByteBuffer.allocate(500);
+            while(true){
+                buffer.limit(message.length()).put(message.getBytes(StandardCharsets.UTF_8)).position(0);
+                var wrote = socket.write_all(buffer).await();
+                buffer.clear().limit(wrote);
+                var read = socket.read_all(buffer).await();
+                System.out.print(new String(buffer.array(), 0, read));
+                buffer.clear();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return Future.ret(null);
+    }
 
 //    public Future<String> closing(int number){
 //        try(var m = new Meow()){

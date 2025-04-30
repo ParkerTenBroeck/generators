@@ -16,6 +16,10 @@ public interface Future<R> {
         throw new RuntimeException("NO!");
     }
 
+    static Future<Void> ret(){
+        throw new RuntimeException();
+    }
+
     static void yield() {
         throw new RuntimeException("NO!");
     }

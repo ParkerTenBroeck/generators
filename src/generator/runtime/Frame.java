@@ -16,7 +16,7 @@ public record Frame(FrameTracker.Type[] locals, FrameTracker.Type[] stack) {
         int slot = 0;
         for (var entry : locals) {
             slot++;
-            if (slot <= loc_off) continue;
+            if (slot <= smb.paramSlotOff) continue;
 
             if (entry.isCategory2_2nd()) continue;
 

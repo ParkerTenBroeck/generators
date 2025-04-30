@@ -45,11 +45,12 @@ public class FutureSMBuilder extends StateMachineBuilder {
             cob.ifThenElse(bcb -> {
                 bcb.swap().aload(0).swap().putfield(smb.CD_this, AWAITING_FIELD_NAME, CD_Future);
 
+
                 var sst = new SavedStateTracker();
+                bcb.storeLocal(TypeKind.REFERENCE, frame.locals().length+2);
                 frame.save_locals(smb, cob, sst,2);
-                bcb.storeLocal(TypeKind.REFERENCE, 2);
                 frame.save_stack(smb, cob, sst,1);
-                bcb.loadLocal(TypeKind.REFERENCE, 2);
+                bcb.loadLocal(TypeKind.REFERENCE, frame.locals().length+2);
                 bcb.areturn().labelBinding(restore_label);
                 sst.restore_all(smb, cob);
 
@@ -118,7 +119,7 @@ public class FutureSMBuilder extends StateMachineBuilder {
 
     @Override
     protected String uniqueName() {
-        return "Fut"+super.uniqueName();
+        return "Fut";
     }
 
     @Override

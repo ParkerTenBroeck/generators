@@ -234,13 +234,8 @@ public class FrameTracker {
         }
 
         for (var attr : com.findAttributes(Attributes.stackMapTable())) {
-            var entries = new ArrayList<StackMapFrameInfo>();
             for (var smfi : attr.entries()) {
-                var locals = new ArrayList<>(smfi.locals());
-                for (int i = 0; i < smb.params.length; i++)
-                    locals.removeFirst();
-                entries.add(StackMapFrameInfo.of(smfi.target(), locals, smfi.stack()));
-                stackMapFrames.put(smfi.target(), entries.getLast());
+                stackMapFrames.put(smfi.target(), smfi);
             }
         }
     }
@@ -471,7 +466,6 @@ public class FrameTracker {
     public void encounterLabel(Label l) {
         var tmp = stackMapFrames.get(l);
         if (tmp != null) {
-//            if(tmp.frameType()==252)
             stack.clear();
             locals.clear();
             for( var sl : tmp.stack())
@@ -479,13 +473,6 @@ public class FrameTracker {
 
             for( var sl : tmp.locals())
                 locals.add(Type.verificationType(sl));
-
-//            while(locals.size()>tmp.locals().size())locals.removeLast();
-//            while(locals.size()<tmp.locals().size())locals.add(null);
-//            int slot = 0;
-//            for( var local : tmp.locals()){
-//                locals.set(slot, Type.verificationType(local));
-//            }
         }
     }
 }

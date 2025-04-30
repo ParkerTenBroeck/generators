@@ -25,7 +25,7 @@ public class SavedStateTracker {
         }
 
         var s = new StackState(name, desc);
-        saved.addFirst(s);
+        saved.add(s);
         return s;
     }
 
@@ -51,8 +51,22 @@ public class SavedStateTracker {
         return this;
     }
 
+    public void restore_stack(StateMachineBuilder smb, CodeBuilder cob){
+        for(int i = saved.size()-1; i >= 0; i --){
+            if(saved.get(i) instanceof StackState)
+                restore(smb, cob, saved.get(i));
+        }
+    }
+
+    public void restore_locals(StateMachineBuilder smb, CodeBuilder cob){
+        for(int i = saved.size()-1; i >= 0; i --){
+            if(saved.get(i) instanceof StackState)
+                restore(smb, cob, saved.get(i));
+        }
+    }
+
     public void restore_all(StateMachineBuilder smb, CodeBuilder cob) {
         while(!saved.isEmpty())
-            restore(smb, cob, saved.getFirst());
+            restore(smb, cob, saved.getLast());
     }
 }
