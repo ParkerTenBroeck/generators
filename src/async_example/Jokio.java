@@ -6,6 +6,8 @@ import generator.future.Waker;
 import java.util.ArrayDeque;
 import java.util.HashSet;
 import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class Jokio implements Runnable{
 
@@ -18,8 +20,8 @@ public class Jokio implements Runnable{
 
         @Override
         public void wake() {
+            woke.add(this);
             synchronized (Jokio.this){
-                woke.add(this);
                 Jokio.this.notifyAll();
             }
         }
@@ -42,34 +44,36 @@ public class Jokio implements Runnable{
         return ((Task<?>)waker).runtime();
     }
 
-    private final HashSet<Task<?>> current = new HashSet<>();
-    private final Queue<Task<?>> woke = new ArrayDeque<>();
+    private final AtomicInteger current = new AtomicInteger(0);
+    private final ConcurrentLinkedDeque<Task<?>> woke = new ConcurrentLinkedDeque<>();
 
     public void blocking(Future<?> fut){
         spawn(fut).run();
     }
 
-    public synchronized Jokio spawn(Future<?> future){
+    public Jokio spawn(Future<?> future){
         var task = new Task<>(future);
-        current.add(task);
+        current.getAndIncrement();
         woke.add(task);
         return this;
     }
 
     @Override
-    public synchronized void run(){
-        while(!current.isEmpty()) {
-            while(woke.isEmpty()) {
-                try {
-                    this.wait();
-                } catch (InterruptedException e) {
-                    throw new RuntimeException(e);
+    public void run(){
+        while(current.get() > 0) {
+            synchronized (this) {
+                while (woke.isEmpty()) {
+                    try {
+                        this.wait();
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
                 }
             }
             var task = woke.poll();
             var result = task.future.poll(task);
             if(result!=Future.Pending.INSTANCE) {
-                current.remove(task);
+                current.getAndDecrement();
                 System.out.println(result);
             }
         }
