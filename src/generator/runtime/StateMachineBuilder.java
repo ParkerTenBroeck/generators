@@ -72,10 +72,12 @@ public abstract class StateMachineBuilder {
 
         System.out.println("FRAME");
         var lt = new FrameTracker(this, src_com);
+        int bco = 0;
         for(var coe : src_com){
-            if(coe instanceof Instruction) {
+            if(coe instanceof Instruction i) {
                 frames.add(new Frame(lt.locals(), lt.stack()));
-                System.out.println(frames.getLast() + " " + coe);
+                System.out.println(bco + " " + frames.getLast() + " " + coe);
+                bco += i.sizeInBytes();
             }
             lt.encounter(coe);
 

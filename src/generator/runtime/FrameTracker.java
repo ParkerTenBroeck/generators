@@ -279,8 +279,8 @@ public class FrameTracker {
         while(locals.size()<=slot)locals.add(null);
 
         var old = locals.get(slot);
-            if(old == Type.DOUBLE_TYPE || old == Type.LONG_TYPE)
-                locals.set(slot+1, Type.TOP_TYPE);
+        if(old == Type.DOUBLE_TYPE || old == Type.LONG_TYPE)
+            locals.set(slot+1, Type.TOP_TYPE);
         if(old == Type.DOUBLE2_TYPE || old == Type.LONG2_TYPE)
             locals.set(slot-1, Type.TOP_TYPE);
         locals.set(slot, type);
@@ -471,6 +471,7 @@ public class FrameTracker {
     public void encounterLabel(Label l) {
         var tmp = stackMapFrames.get(l);
         if (tmp != null) {
+//            if(tmp.frameType()==252)
             stack.clear();
             locals.clear();
             for( var sl : tmp.stack())

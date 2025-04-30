@@ -72,49 +72,58 @@ public class Examples {
 //        return Gen.ret();
 //    }
 
-    public static Future<String> awaitTest2(int number){
-        ((Future<?>)new Delay(number)).await();
-        return Future.ret(number+"ms");
-    }
+//    public static Future<String> awaitTest2(int number){
+//        ((Future<?>)new Delay(number)).await();
+//        return Future.ret(number+"ms");
+//    }
+//
+//
+//    public Future<Integer> number(int value){
+//        Waker.waker().wake();
+//        Future.yield();
+//        return Future.ret(value);
+//    }
 
+//    public static Future<Void> send(ByteBuffer buffer, Socket socket){
+//        String message = "hello world!\n";
+//        buffer.limit(message.length()).put(message.getBytes(StandardCharsets.UTF_8)).position(0);
+//        var wrote = socket.write_all(buffer).await();
+//        buffer.clear().limit(wrote);
+//        var read = socket.read_all(buffer).await();
+//        System.out.println(new String(buffer.array(), 0, read));
+//
+//        return Future.ret(null);
+//    }
 
-    public Future<Integer> number(int value){
-        Waker.waker().wake();
-        Future.yield();
-        return Future.ret(value);
-    }
-
-    public Future<Void> send(ByteBuffer buffer, Socket socket){
-        String message = "hello world!\n";
-        buffer.limit(message.length()).put(message.getBytes(StandardCharsets.UTF_8)).position(0);
-        var wrote = socket.write_all(buffer).await();
-        buffer.clear().limit(wrote);
-        var read = socket.read_all(buffer).await();
-        System.out.println(new String(buffer.array(), 0, read));
-
-        return Future.ret(null);
-    }
-
-    public Future<String> awaitTest(int number){
-//        var result = number(10).await()+number(20).await();
-//        Jokio.runtime().await().spawn(awaitTest2(5000));
-
+    public static Future<Void> forever(Socket socket){
         var buffer = ByteBuffer.allocate(500);
-        try(var socket = Socket.connect(new InetSocketAddress("45.79.112.203", 4242)).await()){
-           send(buffer, socket).await();
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-
-        return Future.ret("");
-    }
-
-    public Future<String> closing(int number){
-        try(var m = new Meow()){
-            var result = awaitTest2(number).await();
-            return Future.ret(result);
+        while(true){
+//            send(buffer, socket).await();
+            ((Future<?>)new Delay(1000 + buffer.get())).await();
+            System.out.println(socket);
         }
     }
+
+//    public Future<String> awaitTest(int number){
+////        var result = number(10).await()+number(20).await();
+////        Jokio.runtime().await().spawn(awaitTest2(5000));
+//
+//        try(var socket = Socket.connect(new InetSocketAddress("45.79.112.203", 4242)).await()){
+//            forever(socket).await();
+//        } catch (Exception e) {
+//            e.printStackTrace();
+////            throw new RuntimeException(e);
+//        }
+//
+//        return Future.ret("");
+//    }
+
+//    public Future<String> closing(int number){
+//        try(var m = new Meow()){
+//            var result = awaitTest2(number).await();
+//            return Future.ret(result);
+//        }
+//    }
 
     public static class Meow implements AutoCloseable{
         {

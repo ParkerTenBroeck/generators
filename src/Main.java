@@ -57,7 +57,7 @@ public class Main implements Runnable {
     }
 
     void await(){
-        new Jokio().blocking(new Examples().awaitTest(2000));
+        new Jokio().blocking(Examples.forever(null));
     }
 
 
