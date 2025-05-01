@@ -5,23 +5,22 @@ import generator.future.Waker;
 
 import java.util.ArrayDeque;
 import java.util.HashSet;
-import java.util.Queue;
-import java.util.concurrent.ConcurrentLinkedDeque;
-import java.util.concurrent.atomic.AtomicInteger;
 
 public class Jokio implements Runnable{
 
-    private class Task<T> implements Waker{
-        public final Future<T> future;
+    public static long polled = 0;
+    private class Task<T, E extends Throwable> implements Waker{
+        public final Future<T, E> future;
 
-        private Task(Future<T> future) {
+        private Task(Future<T, E> future) {
             this.future = future;
         }
 
         @Override
         public void wake() {
-            woke.add(this);
             synchronized (Jokio.this){
+                if(wokeSet.add(this))
+                    wokeQueue.add(this);
                 Jokio.this.notifyAll();
             }
         }
@@ -31,38 +30,42 @@ public class Jokio implements Runnable{
         }
     }
 
-    public static Future<Jokio> runtime(){
+    public static Future<Jokio, RuntimeException> runtime(){
         return new Future<>() {
             @Override
             public Jokio poll(Waker waker) {
-                return ((Task<?>)waker).runtime();
+                return ((Task<?, ?>)waker).runtime();
             }
         };
     }
 
     public static Jokio runtime(Waker waker){
-        return ((Task<?>)waker).runtime();
+        return ((Task<?, ?>)waker).runtime();
     }
 
-    private final AtomicInteger current = new AtomicInteger(0);
-    private final ConcurrentLinkedDeque<Task<?>> woke = new ConcurrentLinkedDeque<>();
+    private volatile long current = 0;
+    private final ArrayDeque<Task<?, ?>> wokeQueue = new ArrayDeque<>();
+    private final HashSet<Task<?, ?>> wokeSet = new HashSet<>();
 
-    public void blocking(Future<?> fut){
+    public void blocking(Future<?, RuntimeException> fut){
         spawn(fut).run();
     }
 
-    public Jokio spawn(Future<?> future){
+    public Jokio spawn(Future<?, ?> future){
         var task = new Task<>(future);
-        current.getAndIncrement();
-        woke.add(task);
+        synchronized (this){
+            current++;
+            wokeQueue.add(task);
+            wokeSet.add(task);
+        }
         return this;
     }
 
     @Override
     public void run(){
-        while(current.get() > 0) {
+        while(current > 0) {
             synchronized (this) {
-                while (woke.isEmpty()) {
+                while (wokeQueue.isEmpty()) {
                     try {
                         this.wait();
                     } catch (InterruptedException e) {
@@ -70,12 +73,32 @@ public class Jokio implements Runnable{
                     }
                 }
             }
-            var task = woke.poll();
-            var result = task.future.poll(task);
-            if(result!=Future.Pending.INSTANCE) {
-                current.getAndDecrement();
-                System.out.println(result);
+            Task<?, ?> task;
+            synchronized (this){
+                task = wokeQueue.poll();
+                wokeSet.remove(task);
             }
+            Object result;
+            try{
+                result = task.future.poll(task);
+            }catch (Throwable t){
+                throw new RuntimeException(t);
+////                System.out.println("Future " + task.future + " Threw Exception");
+////                t.printStackTrace();
+//                synchronized (this){
+//                    current--;
+//                    polled++;
+//                }
+//                continue;
+            }
+            synchronized (this){
+                if(result!=Future.Pending.INSTANCE) {
+                    current--;
+                    System.out.println(result);
+                }
+                polled++;
+            }
+
         }
     }
 }

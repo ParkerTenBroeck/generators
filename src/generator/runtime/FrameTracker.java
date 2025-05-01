@@ -6,10 +6,7 @@ import java.lang.classfile.attribute.RuntimeVisibleTypeAnnotationsAttribute;
 import java.lang.classfile.attribute.StackMapFrameInfo;
 import java.lang.classfile.attribute.StackMapTableAttribute;
 import java.lang.classfile.instruction.*;
-import java.lang.constant.ClassDesc;
-import java.lang.constant.DynamicConstantDesc;
-import java.lang.constant.MethodHandleDesc;
-import java.lang.constant.MethodTypeDesc;
+import java.lang.constant.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -91,7 +88,7 @@ public class FrameTracker {
                 case ITEM_BYTE -> "byte";
                 case ITEM_SHORT -> "short";
                 case ITEM_CHAR -> "char";
-                case ITEM_LONG_2ND -> "float2";
+                case ITEM_LONG_2ND -> "long2";
                 case ITEM_DOUBLE_2ND  -> "double2";
                 default -> throw new IllegalStateException("Unexpected value: " + tag);
             };
@@ -311,10 +308,10 @@ public class FrameTracker {
                     case ConstantInstruction c when ins.opcode() == Opcode.ACONST_NULL -> pushStack(Type.NULL_TYPE);
                     case ConstantInstruction c -> {
                         switch(c.constantValue()){
-                            case Double _ -> pushStack(Type.DOUBLE_TYPE);
+                            case Double _ -> pushStack(Type.DOUBLE_TYPE, Type.DOUBLE2_TYPE);
                             case Float _ -> pushStack(Type.FLOAT_TYPE);
                             case Integer _ -> pushStack(Type.INTEGER_TYPE);
-                            case Long _ -> pushStack(Type.LONG_TYPE);
+                            case Long _ -> pushStack(Type.LONG_TYPE, Type.LONG2_TYPE);
                             case String _ -> pushStack(Type.STRING_TYPE);
                             case ClassDesc desc -> pushStack(desc);
                             case DynamicConstantDesc dynamicConstantDesc -> pushStack(dynamicConstantDesc.constantType());
@@ -352,9 +349,6 @@ public class FrameTracker {
                     case InvokeInstruction i -> {
                         for(var param : i.typeSymbol().parameterArray())
                             decStack(TypeKind.from(param).slotSize());
-                        if(stack.isEmpty()){
-                            System.out.println(Arrays.toString(i.typeSymbol().parameterArray()));
-                        }
                         popStack();
                         pushStack(i.typeSymbol().returnType());
                     }

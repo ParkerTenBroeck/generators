@@ -1,22 +1,22 @@
 package generator.future;
 
-public interface Future<R> {
+public interface Future<R, E extends Throwable> {
 
-    default Object poll(Waker waker){
+    default Object poll(Waker waker) throws E{
         return Pending.INSTANCE;
     }
 
-    default R await(){
+    default R await() throws E{
         throw new RuntimeException("NO!");
     }
 
     default void cancel(){}
 
-    static <R> Future<R> ret(R r){
+    static <R, E extends Throwable> Future<R, E> ret(R r){
         throw new RuntimeException("NO!");
     }
 
-    static Future<Void> ret(){
+    static <E extends Throwable> Future<Void, E> ret(){
         throw new RuntimeException();
     }
 

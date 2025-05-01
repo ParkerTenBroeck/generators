@@ -32,7 +32,7 @@ public class Main implements Runnable {
 //        }
 //    }
 
-    Object simple_async_rt(Future<?> fut){
+    Object simple_async_rt(Future<?, RuntimeException> fut){
         final var waker = new Waker(){
             @Override
             public void wake() {

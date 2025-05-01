@@ -6,7 +6,7 @@ import generator.future.Waker;
 import java.util.Timer;
 import java.util.TimerTask;
 
-public class Delay implements Future<String> {
+public class Delay implements Future<Void, RuntimeException> {
     private final static Timer timer;
     private TimerTask task;
 
@@ -17,9 +17,13 @@ public class Delay implements Future<String> {
     private int delay;
     private boolean ready;
 
-    public Delay(int ms) {
+    protected Delay(int ms) {
         if (ms < 0) throw new IllegalArgumentException("async_example.Delay cannot be negative");
         delay = ms;
+    }
+
+    public static Future<Void, RuntimeException> delay(int ms){
+        return new Delay(ms);
     }
 
     @Override
