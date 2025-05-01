@@ -95,16 +95,11 @@ public class GenSMBuilder extends StateMachineBuilder {
     }
 
     public GenSMBuilder(ClassModel src_clm, MethodModel src_mem, CodeModel src_com) {
-        super(src_clm, src_mem, src_com);
+        super(src_clm, src_mem, src_com, "Gen");
         smmap.put(new SpecialMethod(CD_Gen, "yield", MTD_Gen_Obj),(smb, cob, sb) -> new YieldHandler(smb, cob, sb, false));
         smmap.put(new SpecialMethod(CD_Gen, "yield", MTD_Gen),(smb, cob, sb) -> new YieldHandler(smb, cob, sb,true));
         smmap.put(new SpecialMethod(CD_Gen, "ret", MTD_Gen_Obj),(smb, cob, sb) -> new RetHandler(smb, cob, sb,false));
         smmap.put(new SpecialMethod(CD_Gen, "ret", MTD_Gen),(smb, cob, sb) -> new RetHandler(smb, cob, sb, true));
-    }
-
-    @Override
-    protected String uniqueName() {
-        return "Gen"+super.uniqueName();
     }
 
     @Override

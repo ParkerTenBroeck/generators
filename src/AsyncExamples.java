@@ -12,8 +12,8 @@ import java.nio.charset.StandardCharsets;
 
 public class AsyncExamples {
 
-    static long sent = 0;
-    static long received = 0;
+    private static long sent = 0;
+    private static long received = 0;
     public static Future<Void, RuntimeException> test(){
         Jokio.runtime().await().spawn(server());
 

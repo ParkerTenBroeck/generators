@@ -155,11 +155,6 @@ public class FutureSMBuilder extends StateMachineBuilder {
     }
 
     @Override
-    protected String uniqueName() {
-        return "Fut";
-    }
-
-    @Override
     protected void buildStateMachineMethod(ClassBuilder clb){
         clb.withInterfaces(List.of(clb.constantPool().classEntry(CD_Future)));
         clb.withMethod("poll", MTD_Object_Waker, ClassFile.ACC_PUBLIC, mb -> mb.withCode(cob -> {
@@ -177,7 +172,7 @@ public class FutureSMBuilder extends StateMachineBuilder {
     }
 
     public FutureSMBuilder(ClassModel src_clm, MethodModel src_mem, CodeModel src_com) {
-        super(src_clm, src_mem, src_com);
+        super(src_clm, src_mem, src_com, "Fut");
         smmap.put(new SpecialMethod(CD_Future, "await", MTD_Obj), AwaitHandler::new);
         smmap.put(new SpecialMethod(CD_Future, "ret", MTD_Future_Obj), RetHandler::new);
         smmap.put(new SpecialMethod(CD_Future, "ret", MTD_Future), RetVoidHandler::new);

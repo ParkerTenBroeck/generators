@@ -10,15 +10,15 @@ import java.lang.constant.ConstantDescs;
 import java.lang.constant.MethodTypeDesc;
 import java.lang.reflect.AccessFlag;
 import java.util.*;
+import java.util.stream.Collectors;
 
 public abstract class StateMachineBuilder {
     public final static String PARAM_PREFIX = "param_";
     public final static String LOCAL_PREFIX = "local_";
     public final static String STATE_NAME = "state";
 
-    private static int sequence;
-
     public final ClassDesc CD_this;
+    public final String innerClassName;
     public final ClassDesc[] params;
     public final MethodTypeDesc MTD_init;
     public final int paramSlotOff;
@@ -30,21 +30,14 @@ public abstract class StateMachineBuilder {
     ArrayList<LState> lstate = new ArrayList<>();
 
     private final ArrayList<Frame> frames = new ArrayList<>();
-    private final ArrayList<SpecialMethodHandler> handlers = new ArrayList<>();
+
+    protected final HashMap<SpecialMethod, SpecialMethodBuilder> smmap = new HashMap<>();
 
     record LState(String name, ClassDesc cd) {
     }
 
     public interface SpecialMethodBuilder{
         SpecialMethodHandler build(StateMachineBuilder smb, CodeBuilder cob, StateBuilder sb);
-    }
-
-    protected HashMap<SpecialMethod, SpecialMethodBuilder> smmap = new HashMap<>();
-
-//    private final ArrayList<SwitchCase> stateSwitchCases = new ArrayList<>();
-
-    protected String uniqueName(){
-        return sequence+++"";
     }
 
     public void params(int slot_start, ParamConsumer consumer){
@@ -55,7 +48,7 @@ public abstract class StateMachineBuilder {
         }
     }
 
-    public StateMachineBuilder(ClassModel src_clm, MethodModel src_mem, CodeModel src_com){
+    public StateMachineBuilder(ClassModel src_clm, MethodModel src_mem, CodeModel src_com, String namePostfix){
         this.src_clm = src_clm;
         this.src_mem = src_mem;
         this.src_com = src_com;
@@ -65,25 +58,22 @@ public abstract class StateMachineBuilder {
         if (!src_mem.flags().has(AccessFlag.STATIC)) {
             mts = mts.insertParameterTypes(0, src_clm.thisClass().asSymbol());
         }
-        var name = src_clm.thisClass().asSymbol().displayName() + "$" + src_mem.methodName().stringValue() + "$" + uniqueName();
+        var cdn = src_clm.thisClass().asSymbol().displayName();
+        var method_name = src_mem.methodName().stringValue();
+        var param_cnd = src_mem.methodTypeSymbol().parameterList().stream().map(desc -> desc.descriptorString().replace("/", "__").replace(";", "__")).collect(Collectors.joining("$"));
+        innerClassName = method_name + "$$" + param_cnd + "$$";
+        var name = cdn + "$" +innerClassName;
 
         this.CD_this = ClassDesc.of(src_clm.thisClass().asSymbol().packageName(), name);
         this.params = mts.parameterArray();
         this.MTD_init = MethodTypeDesc.of(ConstantDescs.CD_void, params);
         this.paramSlotOff = Arrays.stream(params).mapToInt(p -> TypeKind.from(p).slotSize()).sum();
 
-
-        System.out.println("FRAME");
         var lt = new FrameTracker(this, src_com);
-        int bco = 0;
         for(var coe : src_com){
-            if(coe instanceof Instruction i) {
+            if(coe instanceof Instruction)
                 frames.add(new Frame(lt.locals(), lt.stack()));
-                System.out.println(bco + " " + frames.getLast() + " " + coe);
-                bco += i.sizeInBytes();
-            }
             lt.encounter(coe);
-
         }
         frames.add(new Frame(lt.locals(), lt.stack()));
     }
@@ -111,11 +101,6 @@ public abstract class StateMachineBuilder {
         };
     }
 
-//    public int add_state(Label label) {
-//        stateSwitchCases.add(SwitchCase.of(stateSwitchCases.size(), label));
-//        return stateSwitchCases.size() - 1;
-//    }
-
     public void buildSourceMethodShim(CodeBuilder cob){
         cob.new_(CD_this).dup();
         params(0, (_, slot, type) -> {
@@ -125,7 +110,7 @@ public abstract class StateMachineBuilder {
     }
 
     public boolean shouldBeInnerClass(){
-        return false;
+        return true;
     }
 
     public byte[] buildStateMachine(){
@@ -133,7 +118,7 @@ public abstract class StateMachineBuilder {
 
             if(shouldBeInnerClass()){
                 src_clm.findAttributes(Attributes.sourceFile()).forEach(clb::with);
-                clb.with(InnerClassesAttribute.of(InnerClassInfo.of(CD_this, Optional.of(src_clm.thisClass().asSymbol()), Optional.of(CD_this.displayName().split("\\$")[1]), AccessFlag.PUBLIC, AccessFlag.FINAL, AccessFlag.STATIC)));
+                clb.with(InnerClassesAttribute.of(InnerClassInfo.of(CD_this, Optional.of(src_clm.thisClass().asSymbol()), Optional.of(innerClassName), AccessFlag.PUBLIC, AccessFlag.FINAL, AccessFlag.STATIC)));
                 clb.with(NestHostAttribute.of(src_clm.thisClass()));
             }
 
@@ -183,6 +168,8 @@ public abstract class StateMachineBuilder {
 
     public void buildStateMachineCode(ClassBuilder clb, CodeBuilder cob, int loc_param_off) {
         var stateBuilder = new StateBuilder();
+        var handlers = new ArrayList<SpecialMethodHandler>();
+
         boolean ignore_next_pop = false;
 
         var invalid_state = cob.newLabel();
