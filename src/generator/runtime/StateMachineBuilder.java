@@ -10,7 +10,6 @@ import java.lang.constant.ConstantDescs;
 import java.lang.constant.MethodTypeDesc;
 import java.lang.reflect.AccessFlag;
 import java.util.*;
-import java.util.function.BiFunction;
 
 public abstract class StateMachineBuilder {
     public final static String PARAM_PREFIX = "param_";
@@ -36,9 +35,13 @@ public abstract class StateMachineBuilder {
     record LState(String name, ClassDesc cd) {
     }
 
-    protected HashMap<SpecialMethod, BiFunction<StateMachineBuilder, CodeBuilder, SpecialMethodHandler>> smmap = new HashMap<>();
+    public interface SpecialMethodBuilder{
+        SpecialMethodHandler build(StateMachineBuilder smb, CodeBuilder cob, StateBuilder sb);
+    }
 
-    private final ArrayList<SwitchCase> stateSwitchCases = new ArrayList<>();
+    protected HashMap<SpecialMethod, SpecialMethodBuilder> smmap = new HashMap<>();
+
+//    private final ArrayList<SwitchCase> stateSwitchCases = new ArrayList<>();
 
     protected String uniqueName(){
         return sequence+++"";
@@ -108,10 +111,10 @@ public abstract class StateMachineBuilder {
         };
     }
 
-    public int add_state(Label label) {
-        stateSwitchCases.add(SwitchCase.of(stateSwitchCases.size(), label));
-        return stateSwitchCases.size() - 1;
-    }
+//    public int add_state(Label label) {
+//        stateSwitchCases.add(SwitchCase.of(stateSwitchCases.size(), label));
+//        return stateSwitchCases.size() - 1;
+//    }
 
     public void buildSourceMethodShim(CodeBuilder cob){
         cob.new_(CD_this).dup();
@@ -179,43 +182,38 @@ public abstract class StateMachineBuilder {
     }
 
     public void buildStateMachineCode(ClassBuilder clb, CodeBuilder cob, int loc_param_off) {
+        var stateBuilder = new StateBuilder();
         boolean ignore_next_pop = false;
 
         var invalid_state = cob.newLabel();
-        var start_label = cob.newLabel();
-        add_state(start_label);
+        var start_state = stateBuilder.create(cob);
 
         for(var wf : with_frames()){
             if (wf.coe() instanceof InvokeInstruction is){
                 var handler = smmap.get(new SpecialMethod(is.owner().asSymbol(), is.name().stringValue(), is.typeSymbol()));
                 if(handler != null)
-                    handlers.add(handler.apply(this, cob));
+                    handlers.add(handler.build(this, cob, stateBuilder));
             }
         }
 
-        cob.aload(0).getfield(CD_this, STATE_NAME, TypeKind.INT.upperBound()).lookupswitch(invalid_state, stateSwitchCases);
-        var start = cob.startLabel();
-        var end = cob.newLabel();
-        cob.localVariable(0, "this", CD_this, start, end);
+        cob.aload(0).getfield(CD_this, STATE_NAME, TypeKind.INT.upperBound());
+        stateBuilder.buildSwitch(cob, invalid_state);
+
+        cob.localVariable(0, "this", CD_this, cob.startLabel(), cob.endLabel());
 
         {
             int i = 0;
             for (var wf : with_frames()) {
                 if (wf.coe() instanceof InvokeInstruction is) {
                     var h = smmap.get(new SpecialMethod(is.owner().asSymbol(), is.name().stringValue(), is.typeSymbol()));
-                    if(h!=null){
-                        var handler = handlers.get(i++);
-                        cob.labelBinding(handler.handler_start);
-                        handler.buildHandler(this, cob, wf.frame());
-                        cob.goto_(handler.handler_resume);
-                    }
+                    if(h!=null) handlers.get(i++).build_prelude(this, cob, wf.frame());
                 }
             }
         }
 
         SpecialMethodHandler currentHandler = null;
 
-        cob.labelBinding(start_label);
+        start_state.bind(cob);
         for (var wf : with_frames()) {
             var coe = wf.coe();
             var frame = wf.frame();
@@ -227,7 +225,7 @@ public abstract class StateMachineBuilder {
                     }else throw new RuntimeException("Expected Pop Instruction");
                 if (i.opcode() == Opcode.ARETURN){
                     if (currentHandler !=null && currentHandler.replacementKind() == ReplacementKind.ReplacingNextReturn){
-                        currentHandler.insertShim(this, cob);
+                        currentHandler.build_inline(this, cob, frame);
                         currentHandler = null;
                         continue;
                     }
@@ -238,9 +236,9 @@ public abstract class StateMachineBuilder {
                     if(currentHandler!=null)throw new RuntimeException("Multiple method handlers at once not supported");
                     var handler = handlers.removeFirst();
                     if(!handler.removeCall()) cob.with(coe);
-                    if(handler.replacementKind() == ReplacementKind.Immediate) handler.insertShim(this, cob);
+                    if(handler.replacementKind() == ReplacementKind.Immediate) handler.build_inline(this, cob, frame);
                     else if(handler.replacementKind() == ReplacementKind.ImmediateReplacingPop) {
-                        handler.insertShim(this, cob);
+                        handler.build_inline(this, cob, frame);
                         ignore_next_pop = true;
                     }else
                         currentHandler = handler;
@@ -285,7 +283,6 @@ public abstract class StateMachineBuilder {
         cob.new_(ClassDesc.ofDescriptor(IllegalStateException.class.descriptorString())).dup()
                 .invokespecial(ClassDesc.ofDescriptor(IllegalStateException.class.descriptorString()), ConstantDescs.INIT_NAME, ConstantDescs.MTD_void)
                 .athrow();
-        cob.labelBinding(end);
 
         for (var lstate : lstate) {
             clb.withField(lstate.name(), lstate.cd(), ClassFile.ACC_PRIVATE);

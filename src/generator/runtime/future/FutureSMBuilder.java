@@ -17,42 +17,51 @@ public class FutureSMBuilder extends StateMachineBuilder {
     public final static ClassDesc CD_Pending = ClassDesc.ofDescriptor(Future.Pending.class.descriptorString());
 
     public final static MethodTypeDesc MTD_Future_Obj = MethodTypeDesc.of(CD_Future, ConstantDescs.CD_Object);
+    public final static MethodTypeDesc MTD_Future = MethodTypeDesc.of(CD_Future);
     public final static MethodTypeDesc MTD_Object_Waker = MethodTypeDesc.of(ConstantDescs.CD_Object, CD_Waker);
     public final static MethodTypeDesc MTD_Obj = MethodTypeDesc.of(ConstantDescs.CD_Object);
 
     public final static String AWAITING_FIELD_NAME = "awaiting";
 
-    static class AwaitHandler extends SpecialMethodHandler{
-        final int awaiting_state;
-        final Label restore_label;
+    static class AwaitHandler implements SpecialMethodHandler{
+        final StateBuilder.State awaiting;
         final Label save_label;
+        final Label resume_inline;
 
-        public AwaitHandler(StateMachineBuilder smb, CodeBuilder cob) {
-            super(smb, cob);
-            awaiting_state = smb.add_state(restore_label = cob.newLabel());
+        public AwaitHandler(StateMachineBuilder smb, CodeBuilder cob, StateBuilder sb) {
+            awaiting = sb.create(cob);
             save_label = cob.newLabel();
+            resume_inline = cob.newLabel();
         }
 
         public ReplacementKind replacementKind(){return ReplacementKind.Immediate;}
 
         @Override
-        public void buildHandler(StateMachineBuilder smb, CodeBuilder cob, Frame frame) {
-            cob.aload(0).loadConstant(awaiting_state).putfield(smb.CD_this, STATE_NAME, TypeKind.INT.upperBound());
+        public void build_prelude(StateMachineBuilder smb, CodeBuilder cob, Frame frame) {
+            cob.labelBinding(save_label);
+            var sst = new SavedStateTracker();
+            frame.save_locals(smb, cob, sst,2);
+            cob.storeLocal(TypeKind.REFERENCE, frame.locals().length+2);
+            frame.save_stack(smb, cob, sst,1);
+            cob.loadLocal(TypeKind.REFERENCE, frame.locals().length+2);
+            cob.areturn();
+            awaiting.bind(cob);
+            sst.restore_all(smb, cob);
+            cob.goto_(resume_inline);
+        }
+
+        @Override
+        public void build_inline(StateMachineBuilder smb, CodeBuilder cob, Frame frame) {
+            // [... Future]
             var start = cob.newBoundLabel();
-            cob.dup()
-                    .aload(1).invokeinterface(CD_Future, "poll", MTD_Object_Waker).dup()
-                    .instanceOf(CD_Pending);
+            cob.dup().aload(1).invokeinterface(CD_Future, "poll", MTD_Object_Waker).dup().instanceOf(CD_Pending);
+            // [... Future Polled is_pending]
             cob.ifThenElse(bcb -> {
+                awaiting.setState(smb, cob);
+                // [... Future Polled]
                 bcb.swap().aload(0).swap().putfield(smb.CD_this, AWAITING_FIELD_NAME, CD_Future);
-
-
-                var sst = new SavedStateTracker();
-                frame.save_locals(smb, cob, sst,2);
-                bcb.storeLocal(TypeKind.REFERENCE, frame.locals().length+2);
-                frame.save_stack(smb, cob, sst,1);
-                bcb.loadLocal(TypeKind.REFERENCE, frame.locals().length+2);
-                bcb.areturn().labelBinding(restore_label);
-                sst.restore_all(smb, cob);
+                // [... Polled]
+                cob.goto_(save_label).labelBinding(resume_inline);
 
                 bcb.aload(0).getfield(smb.CD_this, AWAITING_FIELD_NAME, CD_Future);
                 bcb.aload(0).aconst_null().putfield(smb.CD_this, AWAITING_FIELD_NAME, CD_Future);
@@ -60,39 +69,52 @@ public class FutureSMBuilder extends StateMachineBuilder {
             }, bcb -> {
                 bcb.swap().pop();
             });
-
+            // [... Polled]
         }
     }
 
-    static class YieldHandler extends SpecialMethodHandler {
-        final int resume_state;
-        final Label resume_label;
+    static class YieldHandler implements SpecialMethodHandler {
+        final StateBuilder.State resume;
+        final Label save_ret;
+        final Label end;
 
-        public YieldHandler(StateMachineBuilder smb, CodeBuilder cob) {
-            super(smb, cob);
-            resume_state = smb.add_state(resume_label = cob.newLabel());
+        public YieldHandler(StateMachineBuilder smb, CodeBuilder cob, StateBuilder sb) {
+            resume = sb.create(cob);
+            save_ret = cob.newLabel();
+            end = cob.newLabel();
         }
 
         public ReplacementKind replacementKind(){return ReplacementKind.Immediate;}
 
         @Override
-        public void buildHandler(StateMachineBuilder smb, CodeBuilder cob, Frame frame) {
+        public void build_prelude(StateMachineBuilder smb, CodeBuilder cob, Frame frame) {
+            cob.labelBinding(save_ret);
             var saved = frame.save(smb, cob, 2, 0);
-            cob.aload(0).loadConstant(resume_state).putfield(smb.CD_this, STATE_NAME, TypeKind.INT.upperBound())
-                        .getstatic(CD_Pending, "INSTANCE", CD_Pending)
-                        .areturn().labelBinding(resume_label);
+
+            resume.setState(smb, cob);
+            cob.getstatic(CD_Pending, "INSTANCE", CD_Pending).areturn();
+
+            resume.bind(cob);
             saved.restore_all(smb, cob);
-        }
-    }
-
-    static class WakerHandler extends SpecialMethodHandler{
-
-        protected WakerHandler(StateMachineBuilder smb, CodeBuilder cob) {
-            super(smb, cob);
+            cob.goto_(end);
         }
 
         @Override
-        public void buildHandler(StateMachineBuilder smb, CodeBuilder cob, Frame frame) {
+        public void build_inline(StateMachineBuilder smb, CodeBuilder cob, Frame frame) {
+            cob.goto_(save_ret);
+            cob.labelBinding(end);
+        }
+    }
+
+    static class WakerHandler implements SpecialMethodHandler{
+
+        protected WakerHandler(StateMachineBuilder smb, CodeBuilder cob, StateBuilder sb) {}
+
+        @Override
+        public void build_prelude(StateMachineBuilder smb, CodeBuilder cob, Frame frame) {}
+
+        @Override
+        public void build_inline(StateMachineBuilder smb, CodeBuilder cob, Frame frame) {
             cob.aload(1);
         }
 
@@ -102,18 +124,33 @@ public class FutureSMBuilder extends StateMachineBuilder {
         }
     }
 
-    static class RetHandler extends SpecialMethodHandler{
-
-
-        protected RetHandler(StateMachineBuilder smb, CodeBuilder cob) {
-            super(smb, cob);
-        }
+    static class RetHandler implements SpecialMethodHandler{
+        protected RetHandler(StateMachineBuilder smb, CodeBuilder cob, StateBuilder sb) {}
 
         public ReplacementKind replacementKind(){return ReplacementKind.ReplacingNextReturn;}
 
         @Override
-        public void buildHandler(StateMachineBuilder smb, CodeBuilder cob, Frame frame) {
+        public void build_prelude(StateMachineBuilder smb, CodeBuilder cob, Frame frame) {}
+
+        @Override
+        public void build_inline(StateMachineBuilder smb, CodeBuilder cob, Frame frame) {
             cob.aload(0).loadConstant(-1).putfield(smb.CD_this, STATE_NAME, TypeKind.INT.upperBound()).areturn();
+        }
+    }
+
+    static class RetVoidHandler implements SpecialMethodHandler{
+        protected RetVoidHandler(StateMachineBuilder smb, CodeBuilder cob, StateBuilder sb) {}
+
+        public ReplacementKind replacementKind(){return ReplacementKind.ReplacingNextReturn;}
+
+        @Override
+        public void build_prelude(StateMachineBuilder smb, CodeBuilder cob, Frame frame) {
+            cob.aload(0).loadConstant(-1).putfield(smb.CD_this, STATE_NAME, TypeKind.INT.upperBound()).aconst_null().areturn();
+        }
+
+        @Override
+        public void build_inline(StateMachineBuilder smb, CodeBuilder cob, Frame frame) {
+
         }
     }
 
@@ -143,6 +180,7 @@ public class FutureSMBuilder extends StateMachineBuilder {
         super(src_clm, src_mem, src_com);
         smmap.put(new SpecialMethod(CD_Future, "await", MTD_Obj), AwaitHandler::new);
         smmap.put(new SpecialMethod(CD_Future, "ret", MTD_Future_Obj), RetHandler::new);
+        smmap.put(new SpecialMethod(CD_Future, "ret", MTD_Future), RetVoidHandler::new);
         smmap.put(new SpecialMethod(CD_Future, "yield", ConstantDescs.MTD_void), YieldHandler::new);
         smmap.put(new SpecialMethod(CD_Waker, "waker", MethodTypeDesc.of(CD_Waker)), WakerHandler::new);
     }

@@ -18,7 +18,7 @@ public class Examples {
         Jokio.runtime().await().spawn(server());
 
 
-        for(int i = 0; i < 100; i ++){
+        for(int i = 0; i < 200; i ++){
             var builder = new StringBuilder();
             for(int c = 0; c < 4096*16*3; c ++)
                 builder.append((char)((Math.random()*('z'-'a')+'a')));

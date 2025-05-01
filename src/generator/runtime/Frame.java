@@ -9,7 +9,7 @@ public record Frame(FrameTracker.Type[] locals, FrameTracker.Type[] stack) {
 
     @Override
     public String toString() {
-        return "Frame[l =" + Arrays.toString(locals) + ", s = " + Arrays.toString(stack) + "]";
+        return "Frame[label =" + Arrays.toString(locals) + ", s = " + Arrays.toString(stack) + "]";
     }
 
     public void save_locals(StateMachineBuilder smb, CodeBuilder cob, SavedStateTracker sst, int loc_off){
