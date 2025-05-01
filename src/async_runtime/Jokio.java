@@ -45,7 +45,7 @@ public class Jokio implements Runnable{
     private final HashSet<Task<?, ?>> wokeSet = new HashSet<>();
     private final HashSet<Task<?, ?>> currentSet = new HashSet<>();
 
-    public void blocking(Future<?, RuntimeException> fut){
+    public void blocking(Future<?, ?> fut){
         spawn(fut).run();
     }
 
