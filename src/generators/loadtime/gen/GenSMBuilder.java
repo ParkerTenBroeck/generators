@@ -1,7 +1,7 @@
-package generator.runtime.gen;
+package generators.loadtime.gen;
 
-import generator.gen.Gen;
-import generator.runtime.*;
+import gen.Gen;
+import generators.loadtime.*;
 
 import java.lang.classfile.*;
 import java.lang.constant.ClassDesc;

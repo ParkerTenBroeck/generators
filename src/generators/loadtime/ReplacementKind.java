@@ -1,4 +1,4 @@
-package generator.runtime;
+package generators.loadtime;
 
 public enum ReplacementKind {
     ImmediateReplacingPop,

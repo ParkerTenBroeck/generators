@@ -1,7 +1,7 @@
-package async_example.net;
+package async_runtime.net;
 
-import generator.future.Future;
-import generator.future.Waker;
+import future.Future;
+import future.Waker;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;

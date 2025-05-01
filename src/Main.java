@@ -1,8 +1,8 @@
-import async_example.Jokio;
-import generator.RT;
-import generator.future.Future;
-import generator.future.Waker;
-import generator.gen.Gen;
+import async_runtime.Jokio;
+import generators.RT;
+import future.Future;
+import future.Waker;
+import gen.Gen;
 
 public class Main implements Runnable {
     public static void main(String[] args) {
@@ -57,7 +57,7 @@ public class Main implements Runnable {
     }
 
     void await(){
-        new Jokio().blocking(Examples.test());
+        new Jokio().blocking(AsyncExamples.test());
     }
 
 

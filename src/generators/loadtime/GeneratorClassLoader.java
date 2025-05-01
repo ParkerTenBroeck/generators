@@ -1,9 +1,9 @@
-package generator.runtime;
+package generators.loadtime;
 
-import generator.future.Future;
-import generator.gen.Gen;
-import generator.runtime.future.FutureSMBuilder;
-import generator.runtime.gen.GenSMBuilder;
+import future.Future;
+import gen.Gen;
+import generators.loadtime.future.FutureSMBuilder;
+import generators.loadtime.gen.GenSMBuilder;
 
 import java.io.IOException;
 import java.lang.classfile.*;

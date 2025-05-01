@@ -1,4 +1,4 @@
-import generator.gen.Gen;
+import gen.Gen;
 
 public class Lexer {
     public sealed interface Token{}

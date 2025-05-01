@@ -1,4 +1,4 @@
-package generator.gen;
+package gen;
 
 public interface Gen<Y, R> {
     Res<Y, R> next();

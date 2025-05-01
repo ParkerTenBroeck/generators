@@ -1,4 +1,4 @@
-package generator.runtime;
+package generators.loadtime;
 
 import java.lang.classfile.*;
 import java.lang.classfile.attribute.RuntimeInvisibleTypeAnnotationsAttribute;
@@ -8,7 +8,6 @@ import java.lang.classfile.attribute.StackMapTableAttribute;
 import java.lang.classfile.instruction.*;
 import java.lang.constant.*;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Objects;
 

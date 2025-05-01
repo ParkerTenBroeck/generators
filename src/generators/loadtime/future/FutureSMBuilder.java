@@ -1,8 +1,8 @@
-package generator.runtime.future;
+package generators.loadtime.future;
 
-import generator.future.Future;
-import generator.future.Waker;
-import generator.runtime.*;
+import future.Future;
+import future.Waker;
+import generators.loadtime.*;
 
 import java.lang.classfile.*;
 import java.lang.constant.ClassDesc;

@@ -1,4 +1,4 @@
-package generator.future;
+package future;
 
 public interface Future<R, E extends Throwable> {
 

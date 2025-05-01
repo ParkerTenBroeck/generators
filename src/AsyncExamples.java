@@ -1,16 +1,16 @@
-import async_example.Delay;
-import async_example.Jokio;
-import async_example.net.ServerSocket;
-import async_example.net.Socket;
-import generator.future.Future;
-import generator.future.Waker;
+import async_runtime.Delay;
+import async_runtime.Jokio;
+import async_runtime.net.ServerSocket;
+import async_runtime.net.Socket;
+import future.Future;
+import future.Waker;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 
-public class Examples {
+public class AsyncExamples {
 
     static long sent = 0;
     static long received = 0;

@@ -1,7 +1,7 @@
-package async_example;
+package async_runtime;
 
-import generator.future.Future;
-import generator.future.Waker;
+import future.Future;
+import future.Waker;
 
 import java.util.ArrayDeque;
 import java.util.HashSet;

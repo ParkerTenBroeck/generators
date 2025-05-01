@@ -1,4 +1,4 @@
-package generator.runtime;
+package generators.loadtime;
 
 import java.lang.classfile.CodeBuilder;
 import java.lang.classfile.Label;

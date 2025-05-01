@@ -1,4 +1,4 @@
-package generator.runtime;
+package generators.loadtime;
 
 import java.lang.classfile.*;
 import java.lang.classfile.attribute.InnerClassInfo;

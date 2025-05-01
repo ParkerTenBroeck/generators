@@ -1,7 +1,7 @@
-package generator;
+package generators;
 
 
-import generator.runtime.GeneratorClassLoader;
+import generators.loadtime.GeneratorClassLoader;
 
 public class RT {
     public static void runWithGeneratorSupport(Class<? extends Runnable> clazz){
