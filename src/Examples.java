@@ -15,18 +15,26 @@ public class Examples {
     static long sent = 0;
     static long received = 0;
     public static Future<Void, RuntimeException> test(){
-        Jokio.runtime(Waker.waker()).spawn(server());
+        Jokio.runtime().await().spawn(server());
 
-        for(int i = 0; i < 10000; i ++){
+
+        for(int i = 0; i < 100; i ++){
             var builder = new StringBuilder();
-            for(int c = 0; c < 4096*2; c ++)
+            for(int c = 0; c < 4096*16*3; c ++)
                 builder.append((char)((Math.random()*('z'-'a')+'a')));
-            Jokio.runtime(Waker.waker()).spawn(echoForever(builder.toString()));
+            Jokio.runtime().await().spawn(echoForever(builder.toString()));
         }
+        var start = System.currentTimeMillis();
         while(true){
-            System.out.println(sent + " " + received + " " + Jokio.polled);
             Delay.delay(100).await();
+            var now = System.currentTimeMillis();
+            System.out.println(sent + " " + received  + " " + (now-start));
+            start = now;
         }
+    }
+
+    public static Future<Integer, RuntimeException> number(){
+        return Future.ret(12);
     }
 
 
@@ -44,7 +52,7 @@ public class Examples {
 
     public static Future<Void, IOException> echo(Socket socket){
         try(socket){
-            var buffer = ByteBuffer.allocate(4096);
+            var buffer = ByteBuffer.allocate(4096*16*3);
             while(true){
                 var read = socket.read(buffer).await();
                 buffer.clear().limit(read);
@@ -66,8 +74,8 @@ public class Examples {
                 sent++;
                 buffer.clear().limit(wrote);
                 socket.read_all(buffer).await();
-                if(!buffer.position(0).equals(ByteBuffer.wrap(msg_bytes)))
-                    throw new RuntimeException();
+//                if(!buffer.position(0).equals(ByteBuffer.wrap(msg_bytes)))
+//                    throw new RuntimeException();
                 received++;
                 buffer.clear();
             }

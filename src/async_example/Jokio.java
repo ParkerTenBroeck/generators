@@ -7,8 +7,6 @@ import java.util.ArrayDeque;
 import java.util.HashSet;
 
 public class Jokio implements Runnable{
-
-    public static long polled = 0;
     private class Task<T, E extends Throwable> implements Waker{
         public final Future<T, E> future;
 
@@ -19,7 +17,7 @@ public class Jokio implements Runnable{
         @Override
         public void wake() {
             synchronized (Jokio.this){
-                if(wokeSet.add(this))
+                if(currentSet.contains(this)&&wokeSet.add(this))
                     wokeQueue.add(this);
                 Jokio.this.notifyAll();
             }
@@ -43,9 +41,9 @@ public class Jokio implements Runnable{
         return ((Task<?, ?>)waker).runtime();
     }
 
-    private volatile long current = 0;
     private final ArrayDeque<Task<?, ?>> wokeQueue = new ArrayDeque<>();
     private final HashSet<Task<?, ?>> wokeSet = new HashSet<>();
+    private final HashSet<Task<?, ?>> currentSet = new HashSet<>();
 
     public void blocking(Future<?, RuntimeException> fut){
         spawn(fut).run();
@@ -54,7 +52,7 @@ public class Jokio implements Runnable{
     public Jokio spawn(Future<?, ?> future){
         var task = new Task<>(future);
         synchronized (this){
-            current++;
+            currentSet.add(task);
             wokeQueue.add(task);
             wokeSet.add(task);
         }
@@ -63,8 +61,9 @@ public class Jokio implements Runnable{
 
     @Override
     public void run(){
-        while(current > 0) {
+        while(true) {
             synchronized (this) {
+                if(currentSet.isEmpty())break;
                 while (wokeQueue.isEmpty()) {
                     try {
                         this.wait();
@@ -77,26 +76,24 @@ public class Jokio implements Runnable{
             synchronized (this){
                 task = wokeQueue.poll();
                 wokeSet.remove(task);
+                if(!currentSet.contains(task))continue;
             }
             Object result;
             try{
                 result = task.future.poll(task);
             }catch (Throwable t){
-                throw new RuntimeException(t);
-////                System.out.println("Future " + task.future + " Threw Exception");
-////                t.printStackTrace();
-//                synchronized (this){
-//                    current--;
-//                    polled++;
-//                }
-//                continue;
+                System.out.println("Future " + task.future + " Threw Exception");
+                t.printStackTrace();
+                synchronized (this){
+                    currentSet.remove(task);
+                }
+                continue;
             }
             synchronized (this){
                 if(result!=Future.Pending.INSTANCE) {
-                    current--;
+                    currentSet.remove(task);
                     System.out.println(result);
                 }
-                polled++;
             }
 
         }

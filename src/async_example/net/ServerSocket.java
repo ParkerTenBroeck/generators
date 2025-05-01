@@ -46,12 +46,6 @@ public class ServerSocket implements AutoCloseable{
                         }else if(key.isAcceptable()){
                             w.wake();
                         }
-//                        else if(key.isConnectable()){
-//                        }else if(key.isReadable()){
-//                            w.wake();
-//                        }else if(key.isWritable()){
-//                            w.wake();
-//                        }
                     }
                 }catch (Exception e){
                     e.printStackTrace();

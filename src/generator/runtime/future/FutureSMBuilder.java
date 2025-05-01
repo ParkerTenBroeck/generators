@@ -47,8 +47,8 @@ public class FutureSMBuilder extends StateMachineBuilder {
 
 
                 var sst = new SavedStateTracker();
-                bcb.storeLocal(TypeKind.REFERENCE, frame.locals().length+2);
                 frame.save_locals(smb, cob, sst,2);
+                bcb.storeLocal(TypeKind.REFERENCE, frame.locals().length+2);
                 frame.save_stack(smb, cob, sst,1);
                 bcb.loadLocal(TypeKind.REFERENCE, frame.locals().length+2);
                 bcb.areturn().labelBinding(restore_label);
