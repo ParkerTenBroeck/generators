@@ -16,6 +16,7 @@ public record Frame(FrameTracker.Type[] locals, FrameTracker.Type[] stack) {
             slot++;
             if (slot <= smb.paramSlotOff) continue;
 
+            if(entry.tag() == FrameTracker.Type.TOP_TYPE.tag())continue;
             if (entry.isCategory2_2nd()) continue;
 
             sst.save_local(smb, cob, entry.toCD(), slot - smb.paramSlotOff + loc_off - 1);

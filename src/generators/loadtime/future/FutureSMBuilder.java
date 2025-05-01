@@ -41,9 +41,9 @@ public class FutureSMBuilder extends StateMachineBuilder {
             cob.labelBinding(save_label);
             var sst = new SavedStateTracker();
             frame.save_locals(smb, cob, sst,2);
-            cob.storeLocal(TypeKind.REFERENCE, frame.locals().length+2);
+            cob.storeLocal(TypeKind.REFERENCE, 2);
             frame.save_stack(smb, cob, sst,1);
-            cob.loadLocal(TypeKind.REFERENCE, frame.locals().length+2);
+            cob.loadLocal(TypeKind.REFERENCE, 2);
             cob.areturn();
             awaiting.bind(cob);
             sst.restore_all(smb, cob);
