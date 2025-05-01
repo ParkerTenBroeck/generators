@@ -145,12 +145,11 @@ public class FutureSMBuilder extends StateMachineBuilder {
 
         @Override
         public void build_prelude(StateMachineBuilder smb, CodeBuilder cob, Frame frame) {
-            cob.aload(0).loadConstant(-1).putfield(smb.CD_this, STATE_NAME, TypeKind.INT.upperBound()).aconst_null().areturn();
         }
 
         @Override
         public void build_inline(StateMachineBuilder smb, CodeBuilder cob, Frame frame) {
-
+            cob.aload(0).loadConstant(-1).putfield(smb.CD_this, STATE_NAME, TypeKind.INT.upperBound()).aconst_null().areturn();
         }
     }
 

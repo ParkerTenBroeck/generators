@@ -2,7 +2,6 @@ import async_runtime.Delay;
 import async_runtime.Jokio;
 import generators.RT;
 import future.Future;
-import future.Waker;
 import gen.Gen;
 
 import java.util.function.Supplier;
@@ -14,7 +13,7 @@ public class Main implements Runnable {
 
     @Override
     public void run() {
-        lambda(() -> {
+        async_lambda(() -> {
             System.out.println("START");
             Delay.delay(100).await();
             System.out.println("END");
@@ -24,13 +23,13 @@ public class Main implements Runnable {
         await();
     }
 
+    void async_lambda(Supplier<Future<?, ?>> lambda){
+        new Jokio().blocking(lambda.get());
+    }
+
 
     void await(){
         new Jokio().blocking(AsyncExamples.test());
-    }
-
-    void lambda(Supplier<Future<?, ?>> lambda){
-        new Jokio().blocking(lambda.get());
     }
 
 
