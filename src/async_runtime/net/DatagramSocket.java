@@ -135,7 +135,7 @@ public class DatagramSocket implements AutoCloseable{
     }
 
     @Override
-    public void close() throws Exception {
+    public void close() throws IOException {
         socket.close();
     }
 }

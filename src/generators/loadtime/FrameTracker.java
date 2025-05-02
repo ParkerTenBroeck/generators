@@ -358,7 +358,7 @@ public class FrameTracker {
                             pushStack(locals.get(l.slot()).toCD());
                     case LookupSwitchInstruction ls -> popStack();
                     case MonitorInstruction m -> popStack();
-                    case NewMultiArrayInstruction nma -> decStack(nma.dimensions()).pushStack(nma.arrayType().asSymbol().arrayType());
+                    case NewMultiArrayInstruction nma -> decStack(nma.dimensions()).pushStack(nma.arrayType().asSymbol());
                     case NewObjectInstruction no -> pushStack(no.className().asSymbol());
                     case NewPrimitiveArrayInstruction npa -> decStack(1).pushStack(npa.typeKind().upperBound().arrayType());
                     case NewReferenceArrayInstruction nra -> decStack(1).pushStack(nra.componentType().asSymbol().arrayType());

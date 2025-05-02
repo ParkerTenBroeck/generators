@@ -10,11 +10,15 @@ public interface Future<R, E extends Throwable> {
 
     default void cancel(){}
 
+    default Future<R, E> non_cancelable(){
+        return this::poll;
+    }
+
     static <R, E extends Throwable> Future<R, E> ret(R r){
         throw new RuntimeException("NO!");
     }
 
-    static <E extends Throwable> Future<Void, E> ret(){
+    static Future<Void, ? extends Throwable> ret(){
         throw new RuntimeException();
     }
 

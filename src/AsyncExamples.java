@@ -1,5 +1,6 @@
 import async_runtime.Delay;
 import async_runtime.Jokio;
+import async_runtime.Util;
 import async_runtime.net.ServerSocket;
 import async_runtime.net.Socket;
 import future.Future;
@@ -37,14 +38,21 @@ public class AsyncExamples {
         return Future.ret(12);
     }
 
-
     public static Future<Void, IOException> server(){
         try(var ss = ServerSocket.bind(new InetSocketAddress("0.0.0.0", 42069))){
             while (true){
-                var socket = ss.accept().await();
-                Jokio.runtime(Waker.waker()).spawn(echo(socket));
+                Util.select(
+                        Util.selectee(ss.accept(), socket -> {
+                            Jokio.runtime(Waker.waker()).spawn(echo(socket));
+                            return Future.ret();
+                        }),
+                        Util.selectee(Delay.delay(500), _ -> {
+                            System.out.println("Timeout");
+                            return Future.ret();
+                        })
+                ).await().await();
             }
-        } catch (Exception e) {
+        } catch (Throwable e) {
             e.printStackTrace();
         }
         return Future.ret(null);

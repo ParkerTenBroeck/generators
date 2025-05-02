@@ -14,21 +14,21 @@ public class Main implements Runnable {
 
     @Override
     public void run() {
-        async_lambda(() -> {
-            System.out.println("START");
-            Delay.delay(100).await();
-            System.out.println("END");
-            return Future.ret();
-        });
-        async_lambda(() -> {
-            var start = System.currentTimeMillis();
-            while(true){
-                Util.first(Delay.delay(500), Delay.delay(1000)).await();
-                var end = System.currentTimeMillis();
-                System.out.println(end-start);
-                start = end;
-            }
-        });
+//        async_lambda(() -> {
+//            System.out.println("START");
+//            Delay.delay(100).await();
+//            System.out.println("END");
+//            return Future.ret();
+//        });
+//        async_lambda(() -> {
+//            var start = System.currentTimeMillis();
+//            while(true){
+//                Util.first(Delay.delay(500), Delay.delay(1000)).await();
+//                var end = System.currentTimeMillis();
+//                System.out.println(end-start);
+//                start = end;
+//            }
+//        });
         lexer();
         await();
     }

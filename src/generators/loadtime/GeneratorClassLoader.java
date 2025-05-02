@@ -76,13 +76,14 @@ public class GeneratorClassLoader extends ClassLoader {
                         cb.withMethod(mem.methodName(), mem.methodType(), mem.flags().flagsMask(), mb -> {
                             mb.withCode(builder::buildSourceMethodShim);
                         });
+                        if(builder.shouldBeInnerClass()){
+                            innerCl.add(InnerClassInfo.of(builder.CD_this, Optional.of(clm.thisClass().asSymbol()), Optional.of(builder.CD_this.displayName()), AccessFlag.PUBLIC, AccessFlag.FINAL, AccessFlag.STATIC));
+                            nestMem.add(ClassDesc.of(builder.CD_this.displayName()));
+                        }
                     }else{
                         cb.with(mem);
                     }
-                    if(builder != null && builder.shouldBeInnerClass()){
-                        innerCl.add(InnerClassInfo.of(builder.CD_this, Optional.of(clm.thisClass().asSymbol()), Optional.of(builder.CD_this.displayName()), AccessFlag.PUBLIC, AccessFlag.FINAL, AccessFlag.STATIC));
-                        nestMem.add(ClassDesc.of(builder.CD_this.displayName()));
-                    }
+
                 }
                 else if (ce instanceof Attribute<?> e){
                     if (e.attributeMapper() != Attributes.nestMembers() && e.attributeMapper() != Attributes.innerClasses())

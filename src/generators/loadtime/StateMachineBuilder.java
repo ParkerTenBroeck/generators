@@ -79,7 +79,7 @@ public abstract class StateMachineBuilder {
         for(var coe : src_com){
             if(coe instanceof Instruction) {
                 frames.add(new Frame(lt.locals(), lt.stack()));
-                System.out.println(frames.getLast() + " " + coe);
+//                System.out.println(frames.getLast() + " " + coe);
             }
             lt.encounter(coe);
         }
