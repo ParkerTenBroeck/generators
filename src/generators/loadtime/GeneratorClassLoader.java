@@ -10,6 +10,7 @@ import java.lang.classfile.*;
 import java.lang.classfile.attribute.*;
 import java.lang.classfile.constantpool.ClassEntry;
 import java.lang.constant.ClassDesc;
+import java.lang.constant.ConstantDescs;
 import java.lang.reflect.AccessFlag;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -77,7 +78,7 @@ public class GeneratorClassLoader extends ClassLoader {
                             mb.withCode(builder::buildSourceMethodShim);
                         });
                         if(builder.shouldBeInnerClass()){
-                            innerCl.add(InnerClassInfo.of(builder.CD_this, Optional.of(clm.thisClass().asSymbol()), Optional.of(builder.CD_this.displayName()), AccessFlag.PUBLIC, AccessFlag.FINAL, AccessFlag.STATIC));
+                            innerCl.add(InnerClassInfo.of(builder.CD_this, Optional.of(clm.thisClass().asSymbol()), Optional.of(builder.CD_this.displayName()), AccessFlag.PRIVATE, AccessFlag.FINAL, AccessFlag.STATIC));
                             nestMem.add(ClassDesc.of(builder.CD_this.displayName()));
                         }
                     }else{

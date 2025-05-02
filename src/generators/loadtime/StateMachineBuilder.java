@@ -138,13 +138,15 @@ public abstract class StateMachineBuilder {
             clb.withField(STATE_NAME, ConstantDescs.CD_int, ClassFile.ACC_PRIVATE);
 
             // constructor
-            clb.withMethod(ConstantDescs.INIT_NAME, MTD_init, ClassFile.ACC_PUBLIC, mb -> mb.withCode(cob -> {
+            clb.withMethod(ConstantDescs.INIT_NAME, MTD_init, ClassFile.ACC_PRIVATE, mb -> mb.withCode(cob -> {
                 cob.aload(0).invokespecial(ConstantDescs.CD_Object, ConstantDescs.INIT_NAME, ConstantDescs.MTD_void);
                 params(1, (param, slot, type) -> {
                     cob.aload(0).loadLocal(TypeKind.from(type), slot).putfield(CD_this, param, type);
                 });
                 cob.return_();
             }));
+
+            clb.withFlags(AccessFlag.PUBLIC, AccessFlag.FINAL);
 
             buildStateMachineMethod(clb);
         });
