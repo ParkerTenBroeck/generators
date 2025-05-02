@@ -2,9 +2,7 @@ package future;
 
 public interface Future<R, E extends Throwable> {
 
-    default Object poll(Waker waker) throws E{
-        return Pending.INSTANCE;
-    }
+    Object poll(Waker waker) throws E;
 
     default R await() throws E{
         throw new RuntimeException("NO!");

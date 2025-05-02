@@ -1,66 +1,34 @@
 package async_runtime.net;
 
+import async_runtime.SelectorThread;
 import future.Future;
 import future.Waker;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.SocketAddress;
+import java.net.SocketOption;
 import java.nio.channels.SelectionKey;
-import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
-import java.util.ArrayDeque;
 
 public class ServerSocket implements AutoCloseable{
 
-    private final static Selector SELECTOR;
-    private record ToRegister(ServerSocketChannel sc, int ops, Waker waker){}
-    private final static ArrayDeque<ToRegister> to_register = new ArrayDeque<>();
-    static{
+    private final static SelectorThread<ServerSocketChannel, Waker> SELECTOR;
+
+    static {
         try {
-            SELECTOR = Selector.open();
+            SELECTOR = new SelectorThread<>("ServerSocket") {
+                @Override
+                public void handle(SelectionKey key, ServerSocketChannel c, Waker w) {
+                    if (!key.isValid()) {
+                    }else if(key.isAcceptable()){
+                        w.wake();
+                    }
+                }
+            };
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-
-        var thread = new Thread(() -> {
-            while(!Thread.currentThread().isInterrupted()){
-                try{
-                    synchronized (to_register){
-                        while(!to_register.isEmpty()){
-                            var to = to_register.poll();
-                            to.sc.register(SELECTOR, to.ops, to.waker);
-                        }
-                    }
-
-                    SELECTOR.select();
-                    var keys = SELECTOR.selectedKeys().iterator();
-
-                    while (keys.hasNext()) {
-                        SelectionKey key = keys.next();
-                        keys.remove();
-                        var c = (ServerSocketChannel)key.channel();
-                        var w = (Waker)key.attachment();
-
-                        if (!key.isValid()) {
-                        }else if(key.isAcceptable()){
-                            w.wake();
-                        }
-                    }
-                }catch (Exception e){
-                    e.printStackTrace();
-                }
-            }
-        });
-        thread.setName("ServerSocket Polling Thread");
-        thread.setDaemon(true);
-        thread.start();
-    }
-
-    private static void register(ServerSocketChannel sc, int ops, Waker waker){
-        synchronized (to_register){
-            to_register.add(new ToRegister(sc, ops, waker));
-        }
-        SELECTOR.wakeup();
     }
 
     private final ServerSocketChannel socket;
@@ -77,27 +45,23 @@ public class ServerSocket implements AutoCloseable{
     }
 
     public Future<Socket, IOException> accept(){
-        return new Future<>() {
-            @Override
-            public Object poll(Waker waker) throws IOException {
-                var socc = socket.accept();
-                if(socc==null) {
-                    register(socket, SelectionKey.OP_ACCEPT, waker);
-                    return Pending.INSTANCE;
-                }
-                socc.configureBlocking(false);
-                return new Socket(socc);
+        return waker -> {
+            var accepted = socket.accept();
+            if(accepted==null) {
+                SELECTOR.register(socket, SelectionKey.OP_ACCEPT, waker);
+                return Future.Pending.INSTANCE;
             }
-
-            @Override
-            public void cancel() {
-                try {
-                    if(socket!=null) socket.close();
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-            }
+            accepted.configureBlocking(false);
+            return new Socket(accepted);
         };
+    }
+
+    public <T> void set_options(SocketOption<T> option, T value) throws IOException{
+        socket.setOption(option, value);
+    }
+
+    public SocketAddress local_address() throws IOException {
+        return socket.getLocalAddress();
     }
 
     @Override
