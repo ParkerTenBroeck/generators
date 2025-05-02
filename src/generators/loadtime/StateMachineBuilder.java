@@ -60,7 +60,13 @@ public abstract class StateMachineBuilder {
         }
         var cdn = src_clm.thisClass().asSymbol().displayName();
         var method_name = src_mem.methodName().stringValue();
-        var param_cnd = src_mem.methodTypeSymbol().parameterList().stream().map(desc -> desc.descriptorString().replace("/", "__").replace(";", "__")).collect(Collectors.joining("$"));
+        var param_cnd = src_mem.methodTypeSymbol().parameterList().stream().map(
+                desc -> desc.descriptorString()
+                        .replace("/", "__")
+                        .replace(";", "__")
+                        .replace("[", "_$_$_")
+                )
+                .collect(Collectors.joining("$"));
         innerClassName = method_name + "$$" + param_cnd + "$$";
         var name = cdn + "$" +innerClassName;
 
@@ -71,8 +77,10 @@ public abstract class StateMachineBuilder {
 
         var lt = new FrameTracker(this, src_com);
         for(var coe : src_com){
-            if(coe instanceof Instruction)
+            if(coe instanceof Instruction) {
                 frames.add(new Frame(lt.locals(), lt.stack()));
+                System.out.println(frames.getLast() + " " + coe);
+            }
             lt.encounter(coe);
         }
         frames.add(new Frame(lt.locals(), lt.stack()));

@@ -1,5 +1,6 @@
 import async_runtime.Delay;
 import async_runtime.Jokio;
+import async_runtime.Util;
 import generators.RT;
 import future.Future;
 import gen.Gen;
@@ -18,6 +19,15 @@ public class Main implements Runnable {
             Delay.delay(100).await();
             System.out.println("END");
             return Future.ret();
+        });
+        async_lambda(() -> {
+            var start = System.currentTimeMillis();
+            while(true){
+                Util.first(Delay.delay(500), Delay.delay(1000)).await();
+                var end = System.currentTimeMillis();
+                System.out.println(end-start);
+                start = end;
+            }
         });
         lexer();
         await();

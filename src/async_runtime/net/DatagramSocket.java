@@ -95,6 +95,25 @@ public class DatagramSocket implements AutoCloseable{
         };
     }
 
+    public Future<Integer, IOException> send(ByteBuffer buffer, SocketAddress address){
+        return waker -> {
+            var sent = socket.send(buffer, address);
+            if(sent!=0)return sent;
+            SELECTOR.register(socket, SelectionKey.OP_WRITE, waker);
+            return Future.Pending.INSTANCE;
+        };
+    }
+
+    public Future<SocketAddress, IOException> receive(ByteBuffer buffer){
+        return waker -> {
+            var address = socket.receive(buffer);
+            if(address!=null)return address;
+            SELECTOR.register(socket, SelectionKey.OP_READ, waker);
+            return Future.Pending.INSTANCE;
+        };
+    }
+
+
     public Future<Integer, IOException> read(ByteBuffer buffer){
         return waker -> {
             var read = socket.read(buffer);

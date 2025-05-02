@@ -297,11 +297,12 @@ public class FrameTracker {
             case Instruction ins -> {
                 switch (ins) {
                     case ArrayLoadInstruction al -> {
-                        popStack();
-                        var arr = popStack();
+                        popStack();// array
+                        popStack();//index
+                        var arr = popStack();//type
                         pushStack(arr.toCD().componentType());
                     }
-                    case ArrayStoreInstruction as -> decStack(1 + as.typeKind().slotSize());
+                    case ArrayStoreInstruction as -> decStack(2 + as.typeKind().slotSize());
                     case BranchInstruction b when b.opcode() == Opcode.GOTO || b.opcode() == Opcode.GOTO_W -> {}
                     case BranchInstruction b -> popStack();
                     case ConstantInstruction c when ins.opcode() == Opcode.ACONST_NULL -> pushStack(Type.NULL_TYPE);
@@ -357,10 +358,10 @@ public class FrameTracker {
                             pushStack(locals.get(l.slot()).toCD());
                     case LookupSwitchInstruction ls -> popStack();
                     case MonitorInstruction m -> popStack();
-                    case NewMultiArrayInstruction nma -> decStack(nma.dimensions()).pushStack(nma.arrayType().asSymbol());
+                    case NewMultiArrayInstruction nma -> decStack(nma.dimensions()).pushStack(nma.arrayType().asSymbol().arrayType());
                     case NewObjectInstruction no -> pushStack(no.className().asSymbol());
                     case NewPrimitiveArrayInstruction npa -> decStack(1).pushStack(npa.typeKind().upperBound().arrayType());
-                    case NewReferenceArrayInstruction nra -> decStack(1).pushStack(nra.componentType().asSymbol());
+                    case NewReferenceArrayInstruction nra -> decStack(1).pushStack(nra.componentType().asSymbol().arrayType());
                     case NopInstruction n -> {}
                     
                     case OperatorInstruction o -> {
