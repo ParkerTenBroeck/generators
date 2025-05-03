@@ -58,6 +58,16 @@ public class AsyncExamples {
         return Future.ret(null);
     }
 
+    public static synchronized Future<Void, RuntimeException> meow(){
+        Delay.delay(1000).await();
+        return Future.ret();
+    }
+
+    public synchronized Future<Void, RuntimeException> meow2(){
+        Delay.delay(1000).await();
+        return Future.ret();
+    }
+
     public static Future<Void, IOException> echo(Socket socket){
         try(socket){
             var buffer = ByteBuffer.allocate(4096*16*3);

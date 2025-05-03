@@ -18,7 +18,7 @@ public interface Future<R, E extends Throwable> {
         throw new RuntimeException("NO!");
     }
 
-    static Future<Void, ? extends Throwable> ret(){
+    static <E extends Throwable> Future<Void, E> ret(){
         throw new RuntimeException();
     }
 

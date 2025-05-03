@@ -33,6 +33,8 @@ public abstract class StateMachineBuilder {
 
     protected final HashMap<SpecialMethod, SpecialMethodBuilder> smmap = new HashMap<>();
 
+
+
     record LState(String name, ClassDesc cd) {
     }
 
@@ -162,23 +164,54 @@ public abstract class StateMachineBuilder {
         return false;
     }
 
+    public void nonresumable_return(CodeBuilder cob, TypeKind kind){
+        this.synchronized_exit(cob);
+        cob.return_(kind);
+    }
+
+    public void resumable_return(CodeBuilder cob, StateBuilder.State resume, TypeKind kind) {
+        this.synchronized_exit(cob);
+        cob.return_(kind);
+        resume.bind(cob);
+    }
+
+    protected void synchronized_start(CodeBuilder cob){
+        if(src_mem.flags().has(AccessFlag.SYNCHRONIZED)){
+            if(src_mem.flags().has(AccessFlag.STATIC)) cob.loadConstant(src_clm.thisClass().asSymbol());
+            else cob.aload(0).getfield(CD_this, PARAM_PREFIX+0, src_clm.thisClass().asSymbol());
+            cob.monitorenter();
+        }
+    }
+
+    public void synchronized_exit(CodeBuilder cob){
+        if(src_mem.flags().has(AccessFlag.SYNCHRONIZED)){
+            if(src_mem.flags().has(AccessFlag.STATIC)) cob.loadConstant(src_clm.thisClass().asSymbol());
+            else cob.aload(0).getfield(CD_this, PARAM_PREFIX+0, src_clm.thisClass().asSymbol());
+            cob.monitorexit();
+        }
+    }
+
     protected abstract void buildStateMachineMethod(ClassBuilder clb);
 
     public void buildStateMachineMethodCode(ClassBuilder clb, CodeBuilder cob, int loc_param_off){
+        this.synchronized_start(cob);
         cob.trying(
                 tcob -> buildStateMachineCode(clb, tcob, loc_param_off),
                 // catch anything set our state to -1 and throw the exception
                 ctb -> ctb.catchingAll(
-                        blc ->
-                                blc.aload(0).loadConstant(-1).putfield(CD_this, STATE_NAME, ConstantDescs.CD_int)
-                                        .athrow()
+                        blc -> {
+                            blc.aload(0).loadConstant(-1).putfield(CD_this, STATE_NAME, ConstantDescs.CD_int);
+                            this.synchronized_exit(blc);
+                            cob.athrow();
+                        }
                 )
-        ).aconst_null().areturn();
+        );
     }
 
     public void buildStateMachineCode(ClassBuilder clb, CodeBuilder cob, int loc_param_off) {
         var stateBuilder = new StateBuilder();
         var handlers = new ArrayList<SpecialMethodHandler>();
+
 
         boolean ignore_next_pop = false;
 

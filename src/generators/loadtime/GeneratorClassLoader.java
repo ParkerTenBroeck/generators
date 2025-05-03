@@ -74,7 +74,7 @@ public class GeneratorClassLoader extends ClassLoader {
                     }
                     if(builder!=null&&builder.hasAnyHandlers()){
                         add(builder.CD_this.displayName(), builder.buildStateMachine());
-                        cb.withMethod(mem.methodName(), mem.methodType(), mem.flags().flagsMask(), mb -> {
+                        cb.withMethod(mem.methodName(), mem.methodType(), mem.flags().flagsMask()&~ClassFile.ACC_SYNCHRONIZED, mb -> {
                             mb.withCode(builder::buildSourceMethodShim);
                         });
                         if(builder.shouldBeInnerClass()){

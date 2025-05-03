@@ -46,9 +46,8 @@ public class GenSMBuilder extends StateMachineBuilder {
             frame.save_stack(smb, cob, sst,1);
             cob.loadLocal(TypeKind.REFERENCE, 1);
 
-            cob.areturn();
+            smb.resumable_return(cob, yielded, TypeKind.REFERENCE);
 
-            yielded.bind(cob);
             sst.restore_all(smb, cob);
             cob.goto_(resume);
         }
@@ -89,8 +88,8 @@ public class GenSMBuilder extends StateMachineBuilder {
                     .new_(CD_Ret)
                     .dup_x1()
                     .swap()
-                    .invokespecial(CD_Ret, ConstantDescs.INIT_NAME, MethodTypeDesc.of(ConstantDescs.CD_void, ConstantDescs.CD_Object))
-                    .areturn();
+                    .invokespecial(CD_Ret, ConstantDescs.INIT_NAME, MethodTypeDesc.of(ConstantDescs.CD_void, ConstantDescs.CD_Object));
+            smb.nonresumable_return(cob, TypeKind.REFERENCE);
         }
     }
 

@@ -44,8 +44,9 @@ public class FutureSMBuilder extends StateMachineBuilder {
             cob.storeLocal(TypeKind.REFERENCE, 2);
             frame.save_stack(smb, cob, sst,1);
             cob.loadLocal(TypeKind.REFERENCE, 2);
-            cob.areturn();
-            awaiting.bind(cob);
+
+            smb.resumable_return(cob, awaiting, TypeKind.REFERENCE);
+
             sst.restore_all(smb, cob);
             cob.goto_(resume_inline);
         }
@@ -92,9 +93,10 @@ public class FutureSMBuilder extends StateMachineBuilder {
             var saved = frame.save(smb, cob, 2, 0);
 
             resume.setState(smb, cob);
-            cob.getstatic(CD_Pending, "INSTANCE", CD_Pending).areturn();
+            cob.getstatic(CD_Pending, "INSTANCE", CD_Pending);
 
-            resume.bind(cob);
+            smb.resumable_return(cob, resume, TypeKind.REFERENCE);
+
             saved.restore_all(smb, cob);
             cob.goto_(end);
         }
@@ -134,7 +136,8 @@ public class FutureSMBuilder extends StateMachineBuilder {
 
         @Override
         public void build_inline(StateMachineBuilder smb, CodeBuilder cob, Frame frame) {
-            cob.aload(0).loadConstant(-1).putfield(smb.CD_this, STATE_NAME, TypeKind.INT.upperBound()).areturn();
+            cob.aload(0).loadConstant(-1).putfield(smb.CD_this, STATE_NAME, TypeKind.INT.upperBound());
+            smb.nonresumable_return(cob, TypeKind.REFERENCE);
         }
     }
 
@@ -149,7 +152,8 @@ public class FutureSMBuilder extends StateMachineBuilder {
 
         @Override
         public void build_inline(StateMachineBuilder smb, CodeBuilder cob, Frame frame) {
-            cob.aload(0).loadConstant(-1).putfield(smb.CD_this, STATE_NAME, TypeKind.INT.upperBound()).aconst_null().areturn();
+            cob.aload(0).loadConstant(-1).putfield(smb.CD_this, STATE_NAME, TypeKind.INT.upperBound()).aconst_null();
+            smb.nonresumable_return(cob, TypeKind.REFERENCE);
         }
     }
 

@@ -14,6 +14,8 @@ public class Main implements Runnable {
 
     @Override
     public void run() {
+        new Jokio().blocking(AsyncExamples.meow());
+        new Jokio().blocking(new AsyncExamples().meow2());
 //        async_lambda(() -> {
 //            System.out.println("START");
 //            Delay.delay(100).await();
