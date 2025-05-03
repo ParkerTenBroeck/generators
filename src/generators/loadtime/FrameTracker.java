@@ -1,5 +1,6 @@
 package generators.loadtime;
 
+
 import java.lang.classfile.*;
 import java.lang.classfile.attribute.RuntimeInvisibleTypeAnnotationsAttribute;
 import java.lang.classfile.attribute.RuntimeVisibleTypeAnnotationsAttribute;
@@ -8,6 +9,7 @@ import java.lang.classfile.attribute.StackMapTableAttribute;
 import java.lang.classfile.instruction.*;
 import java.lang.constant.*;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Objects;
 
@@ -30,6 +32,21 @@ public class FrameTracker {
             ITEM_CHAR = 12,
             ITEM_LONG_2ND = 13,
             ITEM_DOUBLE_2ND = 14;
+
+    public static ArrayList<Frame> frames(StateMachineBuilder smb, CodeModel src_com) {
+        var ft = new FrameTracker(smb, src_com);
+        var frames = new ArrayList<Frame>();
+        for(var coe : src_com){
+            if(coe instanceof Instruction) {
+                frames.add(new Frame(ft.locals(), ft.stack(), ft.bci, ft.current_line_number));
+                System.out.println(frames.getLast() + " " + coe);
+            }
+            ft.encounter(coe);
+        }
+        frames.add(new Frame(ft.locals(), ft.stack(), ft.bci, null));
+
+        return frames;
+    }
 
     public Type[] locals() {
         return locals.toArray(Type[]::new);
@@ -55,21 +72,9 @@ public class FrameTracker {
                 DOUBLE2_TYPE = simpleType(ITEM_DOUBLE_2ND),
                 UNITIALIZED_THIS_TYPE = simpleType(ITEM_UNINITIALIZED_THIS);
 
-        //frequently used types to reduce footprint
-        static final Type OBJECT_TYPE = referenceType(CD_Object),
-                THROWABLE_TYPE = referenceType(CD_Throwable),
-                INT_ARRAY_TYPE = referenceType(CD_int.arrayType()),
-                BOOLEAN_ARRAY_TYPE = referenceType(CD_boolean.arrayType()),
-                BYTE_ARRAY_TYPE = referenceType(CD_byte.arrayType()),
-                CHAR_ARRAY_TYPE = referenceType(CD_char.arrayType()),
-                SHORT_ARRAY_TYPE = referenceType(CD_short.arrayType()),
-                LONG_ARRAY_TYPE = referenceType(CD_long.arrayType()),
-                DOUBLE_ARRAY_TYPE = referenceType(CD_double.arrayType()),
-                FLOAT_ARRAY_TYPE = referenceType(CD_float.arrayType()),
-                STRING_TYPE = referenceType(CD_String),
-                CLASS_TYPE = referenceType(CD_Class),
-                METHOD_HANDLE_TYPE = referenceType(CD_MethodHandle),
-                METHOD_TYPE = referenceType(CD_MethodType);
+        static final Type STRING_TYPE = referenceType(CD_String);
+        static final Type METHOD_HANDLE_TYPE = referenceType(CD_MethodHandle);
+        static final Type METHOD_TYPE = referenceType(CD_MethodType);
 
         @Override
         public String toString(){
@@ -101,13 +106,14 @@ public class FrameTracker {
             return new Type(ITEM_OBJECT, desc, 0);
         }
 
-        static Type uninitializedType(ClassDesc sym) {
-            return new Type(ITEM_UNINITIALIZED, sym, 0);
+        static Type uninitializedType(ClassDesc sym, int bci) {
+            return new Type(ITEM_UNINITIALIZED, sym, bci);
         }
 
-        @Override //mandatory override to avoid use of method reference during JDK bootstrap
+        @Override
         public boolean equals(Object o) {
-            return (o instanceof Type t) && t.tag == tag && t.bci == bci && Objects.equals(sym, t.sym);
+            return (o instanceof Type(int tag, ClassDesc sym, int bci))
+                    && tag == this.tag && bci == this.bci && Objects.equals(this.sym, sym);
         }
 
         boolean isCategory2_2nd() {
@@ -132,7 +138,7 @@ public class FrameTracker {
                 case StackMapFrameInfo.ObjectVerificationTypeInfo o -> Type.referenceType(o.classSymbol());
                 case StackMapFrameInfo.SimpleVerificationTypeInfo s -> Type.simpleType(s.tag());
                 case StackMapFrameInfo.UninitializedVerificationTypeInfo u -> {
-                    //Type.simpleType(u.tag());
+//                    Type.uninitializedType(null, u.newTarget());
                     throw new RuntimeException();
                 }
             };
@@ -153,58 +159,22 @@ public class FrameTracker {
                 default -> throw new RuntimeException();
             };
         }
-
-        Type toArray() {
-            return switch (tag) {
-                case ITEM_BOOLEAN -> BOOLEAN_ARRAY_TYPE;
-                case ITEM_BYTE -> BYTE_ARRAY_TYPE;
-                case ITEM_CHAR -> CHAR_ARRAY_TYPE;
-                case ITEM_SHORT -> SHORT_ARRAY_TYPE;
-                case ITEM_INTEGER -> INT_ARRAY_TYPE;
-                case ITEM_LONG -> LONG_ARRAY_TYPE;
-                case ITEM_FLOAT -> FLOAT_ARRAY_TYPE;
-                case ITEM_DOUBLE -> DOUBLE_ARRAY_TYPE;
-                case ITEM_OBJECT -> Type.referenceType(sym.arrayType());
-                default -> OBJECT_TYPE;
-            };
-        }
-
-        Type getComponent() {
-            if (isArray()) {
-                var comp = sym.componentType();
-                if (comp.isPrimitive()) {
-                    return switch (comp.descriptorString().charAt(0)) {
-                        case 'Z' -> Type.BOOLEAN_TYPE;
-                        case 'B' -> Type.BYTE_TYPE;
-                        case 'C' -> Type.CHAR_TYPE;
-                        case 'S' -> Type.SHORT_TYPE;
-                        case 'I' -> Type.INTEGER_TYPE;
-                        case 'J' -> Type.LONG_TYPE;
-                        case 'F' -> Type.FLOAT_TYPE;
-                        case 'D' -> Type.DOUBLE_TYPE;
-                        default -> Type.TOP_TYPE;
-                    };
-                }
-                return Type.referenceType(comp);
-            }
-            return Type.TOP_TYPE;
-        }
     }
 
 
     final ArrayList<Type> stack = new ArrayList<>();
     final ArrayList<Type> locals = new ArrayList<>();
+    final StateMachineBuilder smb;
 
+    LineNumber current_line_number = null;
+    int bci = 0;
     HashMap<Label, StackMapFrameInfo> stackMapFrames = new HashMap<>();
 
-    final StateMachineBuilder smb;
 
 
     FrameTracker(StateMachineBuilder smb, CodeModel com) {
         this.smb = smb;
         int offset = 0;
-
-
 
         for (var param : smb.params) {
             if(param == CD_long){
@@ -244,6 +214,11 @@ public class FrameTracker {
                 desc.isPrimitive()
                         ? (desc == CD_float ? Type.FLOAT_TYPE : Type.INTEGER_TYPE)
                         : Type.referenceType(desc));
+    }
+
+    FrameTracker pushStack(Type... types) {
+        stack.addAll(Arrays.asList(types));
+        return this;
     }
 
     FrameTracker pushStack(Type type) {
@@ -315,10 +290,8 @@ public class FrameTracker {
                             case String _ -> pushStack(Type.STRING_TYPE);
                             case ClassDesc desc -> pushStack(desc);
                             case DynamicConstantDesc dynamicConstantDesc -> pushStack(dynamicConstantDesc.constantType());
-                            case MethodHandleDesc methodHandleDesc ->
-                                throw new RuntimeException();
-                            case MethodTypeDesc methodTypeDesc ->
-                                    throw new RuntimeException();
+                            case MethodHandleDesc methodHandleDesc -> pushStack(Type.METHOD_HANDLE_TYPE);
+                            case MethodTypeDesc methodTypeDesc -> pushStack(Type.METHOD_TYPE);
                         }
                     }
                     case ConvertInstruction c -> decStack(c.fromType().slotSize()).pushStack(c.toType().upperBound());
@@ -341,10 +314,27 @@ public class FrameTracker {
                             decStack(TypeKind.from(param).slotSize());
                         pushStack(i.typeSymbol().returnType());
                     }
-                    case InvokeInstruction i when i.opcode() == Opcode.INVOKESPECIAL && i.name().equalsString(INIT_NAME) -> {
-                        for(var param : i.typeSymbol().parameterArray())
+                    case InvokeInstruction ii when ii.opcode() == Opcode.INVOKESPECIAL && ii.name().equalsString(INIT_NAME) -> {
+                        for(var param : ii.typeSymbol().parameterArray())
                             decStack(TypeKind.from(param).slotSize());
                         var ty = popStack();
+                        if(ty.tag == ITEM_UNINITIALIZED){
+                            if(ty.sym!=null&&!ty.sym.equals(ii.owner().asSymbol()))
+                                throw new RuntimeException();
+                            var init_type = ii.owner().asSymbol();
+                            for(int i = 0; i < stack.size(); i ++){
+                                if(stack.get(i).bci==ty.bci&&stack.get(i).tag==ITEM_UNINITIALIZED){
+                                    stack.set(i, Type.referenceType(init_type));
+                                }
+                            }
+                            for(int i = 0; i < locals.size(); i ++){
+                                if(locals.get(i).bci==ty.bci&&locals.get(i).tag==ITEM_UNINITIALIZED){
+                                    locals.set(i, Type.referenceType(init_type));
+                                }
+                            }
+                        }else{
+                            throw new RuntimeException();
+                        }
                     }
                     case InvokeInstruction i -> {
                         for(var param : i.typeSymbol().parameterArray())
@@ -359,7 +349,7 @@ public class FrameTracker {
                     case LookupSwitchInstruction ls -> popStack();
                     case MonitorInstruction m -> popStack();
                     case NewMultiArrayInstruction nma -> decStack(nma.dimensions()).pushStack(nma.arrayType().asSymbol());
-                    case NewObjectInstruction no -> pushStack(no.className().asSymbol());
+                    case NewObjectInstruction no -> pushStack(Type.uninitializedType(no.className().asSymbol(), bci));
                     case NewPrimitiveArrayInstruction npa -> decStack(1).pushStack(npa.typeKind().upperBound().arrayType());
                     case NewReferenceArrayInstruction nra -> decStack(1).pushStack(nra.componentType().asSymbol().arrayType());
                     case NopInstruction n -> {}
@@ -388,48 +378,48 @@ public class FrameTracker {
                         }
                     }
                     case StackInstruction s -> {
-                        Type type1, type2, type3, type4;
                         switch(s.opcode()){
                             case POP ->
                                     decStack(1);
                             case POP2 ->
                                     decStack(2);
-                            case DUP ->
-                                    pushStack(type1 = popStack()).pushStack(type1);
+                            case DUP -> {
+                                var type1 = popStack();
+                                pushStack(type1, type1);
+                            }
                             case DUP_X1 -> {
-                                type1 = popStack();
-                                type2 = popStack();
-                                pushStack(type1).pushStack(type2).pushStack(type1);
+                                var type1 = popStack();
+                                var type2 = popStack();
+                                pushStack(type1, type2, type1);
                             }
                             case DUP_X2 -> {
-                                type1 = popStack();
-                                type2 = popStack();
-                                type3 = popStack();
-                                pushStack(type1).pushStack(type3).pushStack(type2).pushStack(type1);
+                                var type1 = popStack();
+                                var type2 = popStack();
+                                var type3 = popStack();
+                                pushStack(type1, type3, type2, type1);
                             }
                             case DUP2 -> {
-                                type1 = popStack();
-                                type2 = popStack();
-                                pushStack(type2).pushStack(type1).pushStack(type2).pushStack(type1);
+                                var type1 = popStack();
+                                var type2 = popStack();
+                                pushStack(type2, type1, type2, type1);
                             }
                             case DUP2_X1 -> {
-                                type1 = popStack();
-                                type2 = popStack();
-                                type3 = popStack();
-                                pushStack(type2).pushStack(type1).pushStack(type3).pushStack(type2).pushStack(type1);
+                                var type1 = popStack();
+                                var type2 = popStack();
+                                var type3 = popStack();
+                                pushStack(type2, type1, type3, type2, type1);
                             }
                             case DUP2_X2 -> {
-                                type1 = popStack();
-                                type2 = popStack();
-                                type3 = popStack();
-                                type4 = popStack();
-                                pushStack(type2).pushStack(type1).pushStack(type4).pushStack(type3).pushStack(type2).pushStack(type1);
+                                var type1 = popStack();
+                                var type2 = popStack();
+                                var type3 = popStack();
+                                var type4 = popStack();
+                                pushStack(type2, type1, type4, type3, type2, type1);
                             }
                             case SWAP -> {
-                                type1 = popStack();
-                                type2 = popStack();
-                                pushStack(type1);
-                                pushStack(type2);
+                                var type1 = popStack();
+                                var type2 = popStack();
+                                pushStack(type1, type2);
                             }
                             default -> throw new RuntimeException();
                         }
@@ -448,10 +438,54 @@ public class FrameTracker {
                     case DiscontinuedInstruction d -> throw new IllegalStateException(d.toString());
                     default -> throw new IllegalStateException();
                 }
+                bci += ins.sizeInBytes();
             }
-            case PseudoInstruction _ -> {}
+            case PseudoInstruction p -> {
+                switch(p){
+                    case CharacterRange cr -> {
+                    }
+                    case ExceptionCatch ec -> {
+                    }
+                    case LabelTarget lt -> {
+                    }
+                    case LineNumber ln -> current_line_number = ln;
+                    case LocalVariable lv -> {
+                    }
+                    case LocalVariableType lvt -> {
+                    }
+                    default -> {}
+                }
+            }
             case RuntimeInvisibleTypeAnnotationsAttribute _ -> {}
-            case RuntimeVisibleTypeAnnotationsAttribute _ -> {}
+            case RuntimeVisibleTypeAnnotationsAttribute tas -> {
+                for(var ta : tas.annotations()){
+                    switch(ta.targetInfo()){
+                        case TypeAnnotation.CatchTarget ct -> {
+                        }
+                        case TypeAnnotation.EmptyTarget et -> {
+                        }
+                        case TypeAnnotation.FormalParameterTarget fpt -> {
+                        }
+                        case TypeAnnotation.LocalVarTarget lvt -> {
+                            for(var el : lvt.table()){
+                                el.endLabel();
+                            }
+                        }
+                        case TypeAnnotation.OffsetTarget ot -> {
+                        }
+                        case TypeAnnotation.SupertypeTarget stt -> {
+                        }
+                        case TypeAnnotation.ThrowsTarget tt -> {
+                        }
+                        case TypeAnnotation.TypeArgumentTarget tat -> {
+                        }
+                        case TypeAnnotation.TypeParameterBoundTarget tpbt -> {
+                        }
+                        case TypeAnnotation.TypeParameterTarget tpt -> {
+                        }
+                    }
+                }
+            }
             case CustomAttribute<?> _ -> {}
             case StackMapTableAttribute _ -> {}
         }

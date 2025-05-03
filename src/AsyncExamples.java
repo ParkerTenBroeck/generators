@@ -7,6 +7,10 @@ import future.Future;
 import future.Waker;
 
 import java.io.IOException;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -70,7 +74,7 @@ public class AsyncExamples {
 
     public static Future<Void, IOException> echo(Socket socket){
         try(socket){
-            var buffer = ByteBuffer.allocate(4096*16*3);
+            @Test var buffer = ByteBuffer.allocate(4096*16*3);
             while(true){
                 var read = socket.read(buffer).await();
                 buffer.clear().limit(read);
@@ -84,7 +88,7 @@ public class AsyncExamples {
 
     public static Future<Void, IOException> echoForever(String message){
         byte[] msg_bytes = message.getBytes(StandardCharsets.UTF_8);
-        try(var socket = Socket.connect(new InetSocketAddress("localhost", 42069)).await()){
+        try(@Test var socket = Socket.connect(new InetSocketAddress("localhost", 42069)).await()){
             var buffer = ByteBuffer.allocate(message.length());
             while(true){
                 buffer.limit(message.length()).put(msg_bytes).position(0);
@@ -98,8 +102,20 @@ public class AsyncExamples {
                 buffer.clear();
             }
         } catch (Exception e) {
+
             e.printStackTrace();
         }
         return Future.ret(null);
+    }
+    @Retention(RetentionPolicy.RUNTIME)
+    @Target({ElementType.TYPE_USE, ElementType.LOCAL_VARIABLE})
+    @interface Test {
+
+    }
+
+    static class Meow implements AutoCloseable{
+        @Override
+        public void close() throws Exception {
+        }
     }
 }

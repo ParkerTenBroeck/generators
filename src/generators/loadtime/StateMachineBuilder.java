@@ -29,7 +29,7 @@ public abstract class StateMachineBuilder {
 
     ArrayList<LState> lstate = new ArrayList<>();
 
-    private final ArrayList<Frame> frames = new ArrayList<>();
+    private final ArrayList<Frame> frames;
 
     protected final HashMap<SpecialMethod, SpecialMethodBuilder> smmap = new HashMap<>();
 
@@ -77,15 +77,7 @@ public abstract class StateMachineBuilder {
         this.MTD_init = MethodTypeDesc.of(ConstantDescs.CD_void, params);
         this.paramSlotOff = Arrays.stream(params).mapToInt(p -> TypeKind.from(p).slotSize()).sum();
 
-        var lt = new FrameTracker(this, src_com);
-        for(var coe : src_com){
-            if(coe instanceof Instruction) {
-                frames.add(new Frame(lt.locals(), lt.stack()));
-//                System.out.println(frames.getLast() + " " + coe);
-            }
-            lt.encounter(coe);
-        }
-        frames.add(new Frame(lt.locals(), lt.stack()));
+        frames = FrameTracker.frames(this, src_com);
     }
 
     public record WithFrame(CodeElement coe, Frame frame){}
@@ -236,7 +228,10 @@ public abstract class StateMachineBuilder {
             for (var wf : with_frames()) {
                 if (wf.coe() instanceof InvokeInstruction is) {
                     var h = smmap.get(new SpecialMethod(is.owner().asSymbol(), is.name().stringValue(), is.typeSymbol()));
-                    if(h!=null) handlers.get(i++).build_prelude(this, cob, wf.frame());
+                    if(h!=null) {
+                        if(wf.frame.line()!=null)cob.with(wf.frame.line());
+                        handlers.get(i++).build_prelude(this, cob, wf.frame());
+                    }
                 }
             }
         }

@@ -1,13 +1,14 @@
 package generators.loadtime;
 
 import java.lang.classfile.CodeBuilder;
+import java.lang.classfile.instruction.LineNumber;
 import java.util.Arrays;
 
-public record Frame(FrameTracker.Type[] locals, FrameTracker.Type[] stack) {
+public record Frame(FrameTracker.Type[] locals, FrameTracker.Type[] stack, int bci, LineNumber line) {
 
     @Override
     public String toString() {
-        return "Frame[label =" + Arrays.toString(locals) + ", s = " + Arrays.toString(stack) + "]";
+        return "Frame[l=" + Arrays.toString(locals) + ", s=" + Arrays.toString(stack) + ", bci=" + bci + ", line="+line + "]";
     }
 
     public void save_locals(StateMachineBuilder smb, CodeBuilder cob, SavedStateTracker sst, int loc_off){
