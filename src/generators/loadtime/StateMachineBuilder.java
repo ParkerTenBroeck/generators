@@ -12,7 +12,7 @@ import java.lang.reflect.AccessFlag;
 import java.util.*;
 import java.util.stream.Collectors;
 
-public abstract class StateMachineBuilder {
+public abstract class StateMachineBuilder<T extends StateMachineBuilder<T>> {
     public final static String PARAM_PREFIX = "param_";
     public final static String LOCAL_PREFIX = "local_";
     public final static String STATE_NAME = "state";
@@ -31,15 +31,11 @@ public abstract class StateMachineBuilder {
 
     private final ArrayList<Frame> frames;
 
-    protected final HashMap<SpecialMethod, SpecialMethodBuilder> smmap = new HashMap<>();
+    protected final HashMap<SpecialMethod, SpecialMethodBuilder<T>> smmap = new HashMap<>();
 
 
 
     record LState(String name, ClassDesc cd) {
-    }
-
-    public interface SpecialMethodBuilder{
-        SpecialMethodHandler build(StateMachineBuilder smb, CodeBuilder cob, StateBuilder sb);
     }
 
     public void params(int slot_start, ParamConsumer consumer){
@@ -202,7 +198,7 @@ public abstract class StateMachineBuilder {
 
     public void buildStateMachineCode(ClassBuilder clb, CodeBuilder cob, int loc_param_off) {
         var stateBuilder = new StateBuilder();
-        var handlers = new ArrayList<SpecialMethodHandler>();
+        var handlers = new ArrayList<SpecialMethodHandler<T>>();
 
 
         boolean ignore_next_pop = false;
@@ -214,7 +210,7 @@ public abstract class StateMachineBuilder {
             if (wf.coe() instanceof InvokeInstruction is){
                 var handler = smmap.get(new SpecialMethod(is.owner().asSymbol(), is.name().stringValue(), is.typeSymbol()));
                 if(handler != null)
-                    handlers.add(handler.build(this, cob, stateBuilder));
+                    handlers.add(handler.build((T)this, cob, wf.frame(), stateBuilder));
             }
         }
 
@@ -230,13 +226,13 @@ public abstract class StateMachineBuilder {
                     var h = smmap.get(new SpecialMethod(is.owner().asSymbol(), is.name().stringValue(), is.typeSymbol()));
                     if(h!=null) {
                         if(wf.frame.line()!=null)cob.with(wf.frame.line());
-                        handlers.get(i++).build_prelude(this, cob, wf.frame());
+                        handlers.get(i++).build_prelude((T)this, cob, wf.frame());
                     }
                 }
             }
         }
 
-        SpecialMethodHandler currentHandler = null;
+        SpecialMethodHandler<T> currentHandler = null;
 
         start_state.bind(cob);
         for (var wf : with_frames()) {
@@ -250,7 +246,7 @@ public abstract class StateMachineBuilder {
                     }else throw new RuntimeException("Expected Pop Instruction");
                 if (i.opcode() == Opcode.ARETURN){
                     if (currentHandler !=null && currentHandler.replacementKind() == ReplacementKind.ReplacingNextReturn){
-                        currentHandler.build_inline(this, cob, frame);
+                        currentHandler.build_inline((T)this, cob, frame);
                         currentHandler = null;
                         continue;
                     }
@@ -261,9 +257,9 @@ public abstract class StateMachineBuilder {
                     if(currentHandler!=null)throw new RuntimeException("Multiple method handlers at once not supported");
                     var handler = handlers.removeFirst();
                     if(!handler.removeCall()) cob.with(coe);
-                    if(handler.replacementKind() == ReplacementKind.Immediate) handler.build_inline(this, cob, frame);
+                    if(handler.replacementKind() == ReplacementKind.Immediate) handler.build_inline((T)this, cob, frame);
                     else if(handler.replacementKind() == ReplacementKind.ImmediateReplacingPop) {
-                        handler.build_inline(this, cob, frame);
+                        handler.build_inline((T)this, cob, frame);
                         ignore_next_pop = true;
                     }else
                         currentHandler = handler;

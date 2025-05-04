@@ -17,7 +17,7 @@ public class SavedStateTracker {
 
     }
 
-    private String get_name(StateMachineBuilder smb, ClassDesc desc){
+    private String get_name(StateMachineBuilder<?> smb, ClassDesc desc){
         var value = smb.lstate.stream() // find unused state
                 .filter(v -> saved.stream().noneMatch(s -> s.name().equals(v.name())))
                 .filter(v -> v.cd().equals(desc)).findFirst();
@@ -28,7 +28,7 @@ public class SavedStateTracker {
         return name;
     }
 
-    public SavedState save_stack(StateMachineBuilder smb, CodeBuilder cob, ClassDesc desc){
+    public SavedState save_stack(StateMachineBuilder<?> smb, CodeBuilder cob, ClassDesc desc){
         var name = get_name(smb, desc);
 
         if(TypeKind.from(desc).slotSize()==2){
@@ -42,7 +42,7 @@ public class SavedStateTracker {
         return s;
     }
 
-    public SavedState save_local(StateMachineBuilder smb, CodeBuilder cob, ClassDesc desc, int slot){
+    public SavedState save_local(StateMachineBuilder<?> smb, CodeBuilder cob, ClassDesc desc, int slot){
         var name = get_name(smb, desc);
 
         cob.aload(0).loadLocal(TypeKind.from(desc), slot).putfield(smb.CD_this, name, desc);
@@ -52,7 +52,7 @@ public class SavedStateTracker {
         return s;
     }
 
-    public SavedStateTracker restore(StateMachineBuilder smb, CodeBuilder cob, SavedState s){
+    public SavedStateTracker restore(StateMachineBuilder<?> smb, CodeBuilder cob, SavedState s){
         if(!saved.remove(s))throw new IllegalStateException();
         switch(s){
             case LocalState(var name, var desc, int slot) ->
@@ -63,21 +63,21 @@ public class SavedStateTracker {
         return this;
     }
 
-    public void restore_stack(StateMachineBuilder smb, CodeBuilder cob){
+    public void restore_stack(StateMachineBuilder<?> smb, CodeBuilder cob){
         for(int i = saved.size()-1; i >= 0; i --){
             if(saved.get(i) instanceof StackState)
                 restore(smb, cob, saved.get(i));
         }
     }
 
-    public void restore_locals(StateMachineBuilder smb, CodeBuilder cob){
+    public void restore_locals(StateMachineBuilder<?> smb, CodeBuilder cob){
         for(int i = saved.size()-1; i >= 0; i --){
             if(saved.get(i) instanceof StackState)
                 restore(smb, cob, saved.get(i));
         }
     }
 
-    public void restore_all(StateMachineBuilder smb, CodeBuilder cob) {
+    public void restore_all(StateMachineBuilder<?> smb, CodeBuilder cob) {
         while(!saved.isEmpty())
             restore(smb, cob, saved.getLast());
     }

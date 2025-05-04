@@ -4,11 +4,16 @@ import java.lang.classfile.CodeBuilder;
 import java.lang.classfile.instruction.LineNumber;
 import java.util.Arrays;
 
-public record Frame(FrameTracker.Type[] locals, FrameTracker.Type[] stack, int bci, LineNumber line) {
+public record Frame(FrameTracker.Type[] locals, FrameTracker.Type[] stack, int bci, LineNumber line, FrameTracker.LocalVariableAnnotation[] local_annotations) {
 
     @Override
     public String toString() {
-        return "Frame[l=" + Arrays.toString(locals) + ", s=" + Arrays.toString(stack) + ", bci=" + bci + ", line="+line + "]";
+        return "Frame[l=" + Arrays.toString(locals)
+                + ", s=" + Arrays.toString(stack)
+                + ", bci=" + bci
+                + ", line="+line
+                + ", local_annotations=" + Arrays.toString(local_annotations)
+                + "]";
     }
 
     public void save_locals(StateMachineBuilder smb, CodeBuilder cob, SavedStateTracker sst, int loc_off){

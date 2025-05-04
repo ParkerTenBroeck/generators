@@ -2,12 +2,12 @@ package generators.loadtime;
 
 import java.lang.classfile.CodeBuilder;
 
-public interface SpecialMethodHandler {
+public interface SpecialMethodHandler<T extends StateMachineBuilder> {
 
-    void build_prelude(StateMachineBuilder smb, CodeBuilder cob, Frame frame);
+    void build_prelude(T smb, CodeBuilder cob, Frame frame);
     default boolean removeCall() {
         return true;
     }
-    void build_inline(StateMachineBuilder smb, CodeBuilder cob, Frame frame);
+    void build_inline(T smb, CodeBuilder cob, Frame frame);
     ReplacementKind replacementKind();
 }

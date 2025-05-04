@@ -8,10 +8,7 @@ import java.lang.classfile.attribute.StackMapFrameInfo;
 import java.lang.classfile.attribute.StackMapTableAttribute;
 import java.lang.classfile.instruction.*;
 import java.lang.constant.*;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Objects;
+import java.util.*;
 
 import static java.lang.constant.ConstantDescs.*;
 
@@ -38,14 +35,18 @@ public class FrameTracker {
         var frames = new ArrayList<Frame>();
         for(var coe : src_com){
             if(coe instanceof Instruction) {
-                frames.add(new Frame(ft.locals(), ft.stack(), ft.bci, ft.current_line_number));
-                System.out.println(frames.getLast() + " " + coe);
+                frames.add(new Frame(ft.locals(), ft.stack(), ft.bci, ft.current_line_number, ft.local_annotations()));
+                System.out.println(frames.getLast());
             }
             ft.encounter(coe);
         }
-        frames.add(new Frame(ft.locals(), ft.stack(), ft.bci, null));
+        frames.add(new Frame(ft.locals(), ft.stack(), ft.bci, null, ft.local_annotations()));
 
         return frames;
+    }
+
+    private LocalVariableAnnotation[] local_annotations() {
+        return this.activeAnnotations.toArray(LocalVariableAnnotation[]::new);
     }
 
     public Type[] locals() {
@@ -57,7 +58,6 @@ public class FrameTracker {
 
     public record Type(int tag, ClassDesc sym, int bci) {
 
-        //singleton types
         static final Type TOP_TYPE = simpleType(ITEM_TOP),
                 NULL_TYPE = simpleType(ITEM_NULL),
                 INTEGER_TYPE = simpleType(ITEM_INTEGER),
@@ -133,14 +133,14 @@ public class FrameTracker {
         }
 
 
-        static Type verificationType(StackMapFrameInfo.VerificationTypeInfo v){
+        static Type verificationType(StackMapFrameInfo.VerificationTypeInfo v, FrameTracker t){
             return switch (v){
-                case StackMapFrameInfo.ObjectVerificationTypeInfo o -> Type.referenceType(o.classSymbol());
-                case StackMapFrameInfo.SimpleVerificationTypeInfo s -> Type.simpleType(s.tag());
-                case StackMapFrameInfo.UninitializedVerificationTypeInfo u -> {
-//                    Type.uninitializedType(null, u.newTarget());
-                    throw new RuntimeException();
-                }
+                case StackMapFrameInfo.ObjectVerificationTypeInfo o ->
+                        Type.referenceType(o.classSymbol());
+                case StackMapFrameInfo.SimpleVerificationTypeInfo s ->
+                        Type.simpleType(s.tag());
+                case StackMapFrameInfo.UninitializedVerificationTypeInfo u ->
+                        Type.uninitializedType(null, t.bciMap.get(u.newTarget()));
             };
         }
 
@@ -169,7 +169,12 @@ public class FrameTracker {
     LineNumber current_line_number = null;
     int bci = 0;
     HashMap<Label, StackMapFrameInfo> stackMapFrames = new HashMap<>();
+    HashMap<Label, Integer> bciMap = new HashMap<>();
 
+    public record LocalVariableAnnotation(Annotation annotation, int slot){}
+    final HashSet<LocalVariableAnnotation> activeAnnotations = new HashSet<>();
+    final HashMap<Label, List<LocalVariableAnnotation>> annotationStartMap = new HashMap<>();
+    final HashMap<Label, List<LocalVariableAnnotation>> annotationEndMap = new HashMap<>();
 
 
     FrameTracker(StateMachineBuilder smb, CodeModel com) {
@@ -197,6 +202,40 @@ public class FrameTracker {
                 setLocal(offset, Type.INTEGER_TYPE);
             }
             offset += TypeKind.from(param).slotSize();
+        }
+
+        int bci = 0;
+        for(var ce : com){
+            if(ce instanceof Instruction i)
+                bci += i.sizeInBytes();
+            if(ce instanceof Label l)
+                bciMap.put(l, bci);
+            if(ce instanceof RuntimeVisibleTypeAnnotationsAttribute tas){
+                for(var ta : tas.annotations()){
+                    switch(ta.targetInfo()){
+                        case TypeAnnotation.CatchTarget ct -> {}
+                        case TypeAnnotation.EmptyTarget et -> {}
+                        case TypeAnnotation.FormalParameterTarget fpt -> {}
+                        case TypeAnnotation.LocalVarTarget lvt -> {
+                            for(var el : lvt.table()){
+                                var lva = new LocalVariableAnnotation(ta.annotation(), el.index());
+                                annotationStartMap
+                                        .computeIfAbsent(el.startLabel(), k -> new ArrayList<>())
+                                        .add(lva);
+                                annotationEndMap
+                                        .computeIfAbsent(el.endLabel(), k -> new ArrayList<>())
+                                        .add(lva);
+                            }
+                        }
+                        case TypeAnnotation.OffsetTarget ot -> {}
+                        case TypeAnnotation.SupertypeTarget stt -> {}
+                        case TypeAnnotation.ThrowsTarget tt -> {}
+                        case TypeAnnotation.TypeArgumentTarget tat -> {}
+                        case TypeAnnotation.TypeParameterBoundTarget tpbt -> {}
+                        case TypeAnnotation.TypeParameterTarget tpt -> {}
+                    }
+                }
+            }
         }
 
         for (var attr : com.findAttributes(Attributes.stackMapTable())) {
@@ -290,8 +329,8 @@ public class FrameTracker {
                             case String _ -> pushStack(Type.STRING_TYPE);
                             case ClassDesc desc -> pushStack(desc);
                             case DynamicConstantDesc dynamicConstantDesc -> pushStack(dynamicConstantDesc.constantType());
-                            case MethodHandleDesc methodHandleDesc -> pushStack(Type.METHOD_HANDLE_TYPE);
-                            case MethodTypeDesc methodTypeDesc -> pushStack(Type.METHOD_TYPE);
+                            case MethodHandleDesc _ -> pushStack(Type.METHOD_HANDLE_TYPE);
+                            case MethodTypeDesc _ -> pushStack(Type.METHOD_TYPE);
                         }
                     }
                     case ConvertInstruction c -> decStack(c.fromType().slotSize()).pushStack(c.toType().upperBound());
@@ -442,65 +481,38 @@ public class FrameTracker {
             }
             case PseudoInstruction p -> {
                 switch(p){
-                    case CharacterRange cr -> {
-                    }
-                    case ExceptionCatch ec -> {
-                    }
-                    case LabelTarget lt -> {
-                    }
                     case LineNumber ln -> current_line_number = ln;
-                    case LocalVariable lv -> {
-                    }
-                    case LocalVariableType lvt -> {
-                    }
+                    case CharacterRange cr -> {}
+                    case ExceptionCatch ec -> {}
+                    case LabelTarget lt -> {}
+                    case LocalVariable lv -> {}
+                    case LocalVariableType lvt -> {}
                     default -> {}
                 }
             }
             case RuntimeInvisibleTypeAnnotationsAttribute _ -> {}
-            case RuntimeVisibleTypeAnnotationsAttribute tas -> {
-                for(var ta : tas.annotations()){
-                    switch(ta.targetInfo()){
-                        case TypeAnnotation.CatchTarget ct -> {
-                        }
-                        case TypeAnnotation.EmptyTarget et -> {
-                        }
-                        case TypeAnnotation.FormalParameterTarget fpt -> {
-                        }
-                        case TypeAnnotation.LocalVarTarget lvt -> {
-                            for(var el : lvt.table()){
-                                el.endLabel();
-                            }
-                        }
-                        case TypeAnnotation.OffsetTarget ot -> {
-                        }
-                        case TypeAnnotation.SupertypeTarget stt -> {
-                        }
-                        case TypeAnnotation.ThrowsTarget tt -> {
-                        }
-                        case TypeAnnotation.TypeArgumentTarget tat -> {
-                        }
-                        case TypeAnnotation.TypeParameterBoundTarget tpbt -> {
-                        }
-                        case TypeAnnotation.TypeParameterTarget tpt -> {
-                        }
-                    }
-                }
-            }
+            case RuntimeVisibleTypeAnnotationsAttribute _ -> {}
             case CustomAttribute<?> _ -> {}
             case StackMapTableAttribute _ -> {}
         }
     }
 
     public void encounterLabel(Label l) {
+        if(annotationStartMap.get(l) instanceof ArrayList<LocalVariableAnnotation> list)
+            activeAnnotations.addAll(list);
+
+        if(annotationEndMap.get(l) instanceof ArrayList<LocalVariableAnnotation> list)
+            activeAnnotations.removeAll(list);
+
         var tmp = stackMapFrames.get(l);
         if (tmp != null) {
             stack.clear();
             locals.clear();
             for( var sl : tmp.stack())
-                pushStack(Type.verificationType(sl));
+                pushStack(Type.verificationType(sl, this));
 
             for( var sl : tmp.locals())
-                locals.add(Type.verificationType(sl));
+                locals.add(Type.verificationType(sl, this));
         }
     }
 }

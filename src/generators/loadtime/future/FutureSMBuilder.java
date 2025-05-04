@@ -5,12 +5,15 @@ import future.Waker;
 import generators.loadtime.*;
 
 import java.lang.classfile.*;
+import java.lang.classfile.constantpool.MethodRefEntry;
 import java.lang.constant.ClassDesc;
 import java.lang.constant.ConstantDescs;
 import java.lang.constant.MethodTypeDesc;
+import java.util.HashMap;
 import java.util.List;
+import java.util.function.Consumer;
 
-public class FutureSMBuilder extends StateMachineBuilder {
+public class FutureSMBuilder extends StateMachineBuilder<FutureSMBuilder> {
 
     public final static ClassDesc CD_Future = ClassDesc.ofDescriptor(Future.class.descriptorString());
     public final static ClassDesc CD_Waker = ClassDesc.ofDescriptor(Waker.class.descriptorString());
@@ -23,21 +26,24 @@ public class FutureSMBuilder extends StateMachineBuilder {
 
     public final static String AWAITING_FIELD_NAME = "awaiting";
 
-    static class AwaitHandler implements SpecialMethodHandler{
+    private final HashMap<Integer, Consumer<CodeBuilder>> cancellation_behavior = new HashMap<>();
+
+    static class AwaitHandler implements SpecialMethodHandler<FutureSMBuilder>{
         final StateBuilder.State awaiting;
         final Label save_label;
         final Label resume_inline;
 
-        public AwaitHandler(StateMachineBuilder smb, CodeBuilder cob, StateBuilder sb) {
+        public AwaitHandler(FutureSMBuilder smb, CodeBuilder cob, Frame frame, StateBuilder sb) {
             awaiting = sb.create(cob);
             save_label = cob.newLabel();
             resume_inline = cob.newLabel();
+            smb.yielding_state(awaiting, frame);
         }
 
         public ReplacementKind replacementKind(){return ReplacementKind.Immediate;}
 
         @Override
-        public void build_prelude(StateMachineBuilder smb, CodeBuilder cob, Frame frame) {
+        public void build_prelude(FutureSMBuilder smb, CodeBuilder cob, Frame frame) {
             cob.labelBinding(save_label);
             var sst = new SavedStateTracker();
             frame.save_locals(smb, cob, sst,2);
@@ -52,7 +58,7 @@ public class FutureSMBuilder extends StateMachineBuilder {
         }
 
         @Override
-        public void build_inline(StateMachineBuilder smb, CodeBuilder cob, Frame frame) {
+        public void build_inline(FutureSMBuilder smb, CodeBuilder cob, Frame frame) {
             // [... Future]
             var start = cob.newBoundLabel();
             cob.dup().aload(1).invokeinterface(CD_Future, "poll", MTD_Object_Waker).dup().instanceOf(CD_Pending);
@@ -74,21 +80,23 @@ public class FutureSMBuilder extends StateMachineBuilder {
         }
     }
 
-    static class YieldHandler implements SpecialMethodHandler {
+    static class YieldHandler implements SpecialMethodHandler<FutureSMBuilder> {
         final StateBuilder.State resume;
         final Label save_ret;
         final Label end;
 
-        public YieldHandler(StateMachineBuilder smb, CodeBuilder cob, StateBuilder sb) {
+        public YieldHandler(FutureSMBuilder smb, CodeBuilder cob, Frame frame, StateBuilder sb) {
             resume = sb.create(cob);
             save_ret = cob.newLabel();
             end = cob.newLabel();
+
+            smb.yielding_state(resume, frame);
         }
 
         public ReplacementKind replacementKind(){return ReplacementKind.Immediate;}
 
         @Override
-        public void build_prelude(StateMachineBuilder smb, CodeBuilder cob, Frame frame) {
+        public void build_prelude(FutureSMBuilder smb, CodeBuilder cob, Frame frame) {
             cob.labelBinding(save_ret);
             var saved = frame.save(smb, cob, 2, 0);
 
@@ -102,21 +110,21 @@ public class FutureSMBuilder extends StateMachineBuilder {
         }
 
         @Override
-        public void build_inline(StateMachineBuilder smb, CodeBuilder cob, Frame frame) {
+        public void build_inline(FutureSMBuilder smb, CodeBuilder cob, Frame frame) {
             cob.goto_(save_ret);
             cob.labelBinding(end);
         }
     }
 
-    static class WakerHandler implements SpecialMethodHandler{
+    static class WakerHandler implements SpecialMethodHandler<FutureSMBuilder>{
 
-        protected WakerHandler(StateMachineBuilder smb, CodeBuilder cob, StateBuilder sb) {}
-
-        @Override
-        public void build_prelude(StateMachineBuilder smb, CodeBuilder cob, Frame frame) {}
+        protected WakerHandler(FutureSMBuilder smb, CodeBuilder cob, Frame frame, StateBuilder sb) {}
 
         @Override
-        public void build_inline(StateMachineBuilder smb, CodeBuilder cob, Frame frame) {
+        public void build_prelude(FutureSMBuilder smb, CodeBuilder cob, Frame frame) {}
+
+        @Override
+        public void build_inline(FutureSMBuilder smb, CodeBuilder cob, Frame frame) {
             cob.aload(1);
         }
 
@@ -126,35 +134,100 @@ public class FutureSMBuilder extends StateMachineBuilder {
         }
     }
 
-    static class RetHandler implements SpecialMethodHandler{
-        protected RetHandler(StateMachineBuilder smb, CodeBuilder cob, StateBuilder sb) {}
+    static class RetHandler implements SpecialMethodHandler<FutureSMBuilder>{
+        protected RetHandler(FutureSMBuilder smb, CodeBuilder cob, Frame frame, StateBuilder sb) {}
 
         public ReplacementKind replacementKind(){return ReplacementKind.ReplacingNextReturn;}
 
         @Override
-        public void build_prelude(StateMachineBuilder smb, CodeBuilder cob, Frame frame) {}
+        public void build_prelude(FutureSMBuilder smb, CodeBuilder cob, Frame frame) {}
 
         @Override
-        public void build_inline(StateMachineBuilder smb, CodeBuilder cob, Frame frame) {
+        public void build_inline(FutureSMBuilder smb, CodeBuilder cob, Frame frame) {
             cob.aload(0).loadConstant(-1).putfield(smb.CD_this, STATE_NAME, TypeKind.INT.upperBound());
             smb.nonresumable_return(cob, TypeKind.REFERENCE);
         }
     }
 
-    static class RetVoidHandler implements SpecialMethodHandler{
-        protected RetVoidHandler(StateMachineBuilder smb, CodeBuilder cob, StateBuilder sb) {}
+    static class RetVoidHandler implements SpecialMethodHandler<FutureSMBuilder>{
+        protected RetVoidHandler(FutureSMBuilder smb, CodeBuilder cob, Frame frame, StateBuilder sb) {}
 
         public ReplacementKind replacementKind(){return ReplacementKind.ReplacingNextReturn;}
 
         @Override
-        public void build_prelude(StateMachineBuilder smb, CodeBuilder cob, Frame frame) {
+        public void build_prelude(FutureSMBuilder smb, CodeBuilder cob, Frame frame) {
         }
 
         @Override
-        public void build_inline(StateMachineBuilder smb, CodeBuilder cob, Frame frame) {
+        public void build_inline(FutureSMBuilder smb, CodeBuilder cob, Frame frame) {
             cob.aload(0).loadConstant(-1).putfield(smb.CD_this, STATE_NAME, TypeKind.INT.upperBound()).aconst_null();
             smb.nonresumable_return(cob, TypeKind.REFERENCE);
         }
+    }
+
+    private String fromAnnValue(AnnotationValue value){
+        switch(value){
+            case AnnotationValue.OfAnnotation ofAnnotation -> {
+            }
+            case AnnotationValue.OfArray ofArray -> {
+            }
+            case AnnotationValue.OfClass ofClass -> {
+            }
+            case AnnotationValue.OfConstant ofConstant -> {
+                switch(ofConstant){
+                    case AnnotationValue.OfBoolean ofBoolean -> {
+                    }
+                    case AnnotationValue.OfByte ofByte -> {
+                    }
+                    case AnnotationValue.OfChar ofChar -> {
+                    }
+                    case AnnotationValue.OfDouble ofDouble -> {
+                    }
+                    case AnnotationValue.OfFloat ofFloat -> {
+                    }
+                    case AnnotationValue.OfInt ofInt -> {
+                    }
+                    case AnnotationValue.OfLong ofLong -> {
+                    }
+                    case AnnotationValue.OfShort ofShort -> {
+                    }
+                    case AnnotationValue.OfString ofString -> {
+                        return ofString.stringValue();
+                    }
+                }
+            }
+            case AnnotationValue.OfEnum ofEnum -> {
+            }
+        }
+        throw new RuntimeException();
+    }
+
+    private void yielding_state(StateBuilder.State state, Frame frame){
+        if(frame.local_annotations().length==0)return;
+        cancellation_behavior.put(state.id(), cob -> {
+            for(var ann : frame.local_annotations()){
+                if(ann.annotation().classSymbol().descriptorString().equals(Cancellation.class.descriptorString())){
+                    ClassDesc owner = frame.locals()[ann.slot()].sym();
+                    ClassDesc param = frame.locals()[ann.slot()].sym();
+                    String name = "cancel";
+                    for(var el : ann.annotation().elements()){
+                        switch(el.name().stringValue()){
+                            case "value" -> name = fromAnnValue(el.value());
+                            case "owner" -> {}
+                            case "param" -> {}
+                            case "ret" -> {}
+                        }
+                        el.name().equalsString("value");
+                    }
+                    var mre = cob.constantPool().methodRefEntry(owner, name, MethodTypeDesc.of(ConstantDescs.CD_void));
+                    cob.trying(tcob -> {
+                        tcob.aconst_null()
+//                                .aload(ann.slot())
+                                .invokevirtual(mre);
+                    }, cb -> cb.catchingAll(ccob -> ccob.pop()));
+                }
+            }
+        });
     }
 
     @Override
@@ -165,11 +238,37 @@ public class FutureSMBuilder extends StateMachineBuilder {
             buildStateMachineMethodCode(clb, cob, 2);
         }));
         clb.withMethod("cancel", MethodTypeDesc.of(ConstantDescs.CD_void),  ClassFile.ACC_PUBLIC, mb -> mb.withCode(cob -> {
-            cob.aload(0).getfield(CD_this, AWAITING_FIELD_NAME, CD_Future).dup().ifThen(Opcode.IFNONNULL, boc -> {
-                boc.invokeinterface(CD_Future, "cancel", MethodTypeDesc.of(ConstantDescs.CD_void))
-                        .aload(0).aconst_null().putfield(CD_this, AWAITING_FIELD_NAME, CD_Future).return_();
+
+            this.synchronized_start(cob);
+            cob.trying(tcob -> {
+                tcob.aload(0).getfield(CD_this, STATE_NAME, ConstantDescs.CD_int).istore(1);
+                tcob.aload(0).loadConstant(-1).putfield(CD_this, STATE_NAME, ConstantDescs.CD_int);
+
+                tcob.aload(0).getfield(CD_this, AWAITING_FIELD_NAME, CD_Future).ifThen(Opcode.IFNONNULL, boc -> {
+                    boc.aload(0).getfield(CD_this, AWAITING_FIELD_NAME, CD_Future)
+                            .invokeinterface(CD_Future, "cancel", MethodTypeDesc.of(ConstantDescs.CD_void))
+                            .aload(0).aconst_null().putfield(CD_this, AWAITING_FIELD_NAME, CD_Future);
+                });
+
+                for(var cb : cancellation_behavior.entrySet()){
+                    var end = tcob.newLabel();
+                    tcob.iload(1);
+                    tcob.loadConstant(cb.getKey());
+                    tcob.if_icmpne(end);
+                    cb.getValue().accept(tcob);
+                    tcob.labelBinding(end);
+                }
+
+                this.synchronized_exit(tcob);
+                tcob.return_();
+            }, cb -> {
+                cb.catchingAll(ccob -> {
+                    ccob.pop();
+                    this.synchronized_exit(ccob);
+                    ccob.return_();
+                });
             });
-            cob.pop().return_();
+
         }));
         clb.withField(AWAITING_FIELD_NAME, CD_Future, ClassFile.ACC_PRIVATE);
     }
