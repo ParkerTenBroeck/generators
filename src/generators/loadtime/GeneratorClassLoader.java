@@ -63,8 +63,8 @@ public class GeneratorClassLoader extends ClassLoader {
 
         return ClassFile.of(ClassFile.AttributesProcessingOption.PASS_ALL_ATTRIBUTES, ClassFile.StackMapsOption.STACK_MAPS_WHEN_REQUIRED).build(clm.thisClass().asSymbol(), cb -> {
             for (var ce : clm) {
-                if (ce instanceof MethodModel mem && !isGen && !isFuture) {
-                    StateMachineBuilder builder;
+                if (ce instanceof MethodModel mem && !isGen && !isFuture && mem.code().isPresent()) {
+                    StateMachineBuilder<?> builder;
                     if(mem.methodTypeSymbol().returnType().descriptorString().equals(Gen.class.descriptorString())){
                         builder = new GenSMBuilder(clm, mem, mem.code().get());
                     }else if(mem.methodTypeSymbol().returnType().descriptorString().equals(Future.class.descriptorString())){

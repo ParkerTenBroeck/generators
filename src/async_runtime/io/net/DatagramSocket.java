@@ -1,6 +1,8 @@
-package async_runtime.net;
+package async_runtime.io.net;
 
-import async_runtime.SelectorThread;
+import async_runtime.io.Readable;
+import async_runtime.io.SelectorThread;
+import async_runtime.io.Writable;
 import future.Future;
 import future.Waker;
 
@@ -9,21 +11,20 @@ import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.net.SocketOption;
 import java.nio.ByteBuffer;
+import java.nio.channels.DatagramChannel;
 import java.nio.channels.SelectionKey;
-import java.nio.channels.SocketChannel;
 
-public class Socket implements AutoCloseable{
-    private final static SelectorThread<SocketChannel, Waker> SELECTOR;
+public class DatagramSocket implements AutoCloseable, Readable<IOException>, Writable<IOException> {
+    private final static SelectorThread<DatagramChannel, Waker> SELECTOR;
 
     static {
         try {
-            SELECTOR = new SelectorThread<>("Socket") {
+            SELECTOR = new SelectorThread<>("DatagramSocket") {
                 @Override
-                public void handle(SelectionKey key, SocketChannel c, Waker w) throws IOException {
+                public void handle(SelectionKey key, DatagramChannel c, Waker w) {
                     if (!key.isValid()) {
                     }else if(key.isAcceptable()){
                     }else if(key.isConnectable()){
-                        c.finishConnect();
                         w.wake();
                     }else if(key.isReadable()){
                         w.wake();
@@ -37,33 +38,34 @@ public class Socket implements AutoCloseable{
         }
     }
 
-    private final SocketChannel socket;
+    private final DatagramChannel socket;
 
-    protected Socket(SocketChannel sc){
+    protected DatagramSocket(DatagramChannel sc){
         this.socket = sc;
     }
 
-    public static Future<Socket, IOException> connect(InetSocketAddress inet) {
-        return new Future<>() {
-            public SocketChannel socket;
-            @Override
-            public Object poll(Waker waker) throws IOException {
-                if(socket==null){
-                    socket = SocketChannel.open();
-                    socket.configureBlocking(false);
-                    var connected = socket.connect(inet);
-                    if(!connected) {
-                        SELECTOR.register(socket, SelectionKey.OP_CONNECT, waker);
-                        return Pending.INSTANCE;
-                    }
-                }
-                if(socket.isConnected()) return new Socket(socket);
-                return Pending.INSTANCE;
-            }
-        };
+    public static DatagramSocket open(InetSocketAddress inet) throws IOException {
+        var socket = DatagramChannel.open();
+        socket.configureBlocking(false);
+        return new DatagramSocket(socket);
     }
 
-    public <T> Socket set_options(SocketOption<T> option, T value) throws IOException{
+    public DatagramSocket bind(InetSocketAddress inet) throws IOException {
+        socket.bind(inet);
+        return this;
+    }
+
+    public DatagramSocket connect(InetSocketAddress inet) throws IOException {
+        socket.connect(inet);
+        return this;
+    }
+
+    public DatagramSocket disconnect() throws IOException{
+        socket.disconnect();
+        return this;
+    }
+
+    public <T> DatagramSocket set_options(SocketOption<T> option, T value) throws IOException{
         socket.setOption(option, value);
         return this;
     }
@@ -76,6 +78,7 @@ public class Socket implements AutoCloseable{
         return socket.getRemoteAddress();
     }
 
+    @Override
     public Future<Integer, IOException> write(ByteBuffer buffer){
         return waker -> {
             var wrote = socket.write(buffer);
@@ -85,6 +88,7 @@ public class Socket implements AutoCloseable{
         };
     }
 
+    @Override
     public Future<Integer, IOException> write_all(ByteBuffer buffer){
         var wrote = buffer.remaining();
         return waker -> {
@@ -95,6 +99,25 @@ public class Socket implements AutoCloseable{
         };
     }
 
+    public Future<Integer, IOException> send(ByteBuffer buffer, SocketAddress address){
+        return waker -> {
+            var sent = socket.send(buffer, address);
+            if(sent!=0)return sent;
+            SELECTOR.register(socket, SelectionKey.OP_WRITE, waker);
+            return Future.Pending.INSTANCE;
+        };
+    }
+
+    public Future<SocketAddress, IOException> receive(ByteBuffer buffer){
+        return waker -> {
+            var address = socket.receive(buffer);
+            if(address!=null)return address;
+            SELECTOR.register(socket, SelectionKey.OP_READ, waker);
+            return Future.Pending.INSTANCE;
+        };
+    }
+
+    @Override
     public Future<Integer, IOException> read(ByteBuffer buffer){
         return waker -> {
             var read = socket.read(buffer);
@@ -104,6 +127,7 @@ public class Socket implements AutoCloseable{
         };
     }
 
+    @Override
     public Future<Integer, IOException> read_all(ByteBuffer buffer){
         int read = buffer.remaining();
         return waker -> {

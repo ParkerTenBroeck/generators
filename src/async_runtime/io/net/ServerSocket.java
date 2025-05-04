@@ -1,9 +1,12 @@
-package async_runtime.net;
+package async_runtime.io.net;
 
-import async_runtime.SelectorThread;
+import async_runtime.io.Readable;
+import async_runtime.io.SelectorThread;
+import async_runtime.io.Writable;
 import future.Future;
 import future.Waker;
 
+import java.io.IO;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
@@ -11,7 +14,7 @@ import java.net.SocketOption;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.ServerSocketChannel;
 
-public class ServerSocket implements AutoCloseable{
+public class ServerSocket implements AutoCloseable {
 
     private final static SelectorThread<ServerSocketChannel, Waker> SELECTOR;
 
