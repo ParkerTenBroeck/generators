@@ -4,6 +4,7 @@ import async_runtime.Util;
 import generators.RT;
 import future.Future;
 import gen.Gen;
+import generators.loadtime.future.Cancellation;
 
 import java.util.function.Supplier;
 
@@ -12,10 +13,38 @@ public class Main implements Runnable {
         RT.runWithGeneratorSupport(Main.class);
     }
 
+    class Meow implements AutoCloseable{
+        {
+            System.out.println("CREATED");
+        }
+        @Override
+        public void close() {
+            System.out.println("CLOSED");
+        }
+    }
+
+    Future<Void, RuntimeException> nya(){
+        try(@Cancellation("close") var nya = new Meow()){
+            Future.yield();
+            Future.yield();
+            int beep = 1;
+            Future.yield();
+            Future.yield();
+            return Future.ret(null);
+        }
+    }
+
+
+
     @Override
     public void run() {
-        new Jokio().blocking(AsyncExamples.meow());
-        new Jokio().blocking(new AsyncExamples().meow2());
+//        new Jokio().blocking();
+        var future = nya();
+        future.poll(null);
+        future.poll(null);
+        future.cancel();
+//        new Jokio().blocking(AsyncExamples.meow());
+//        new Jokio().blocking(new AsyncExamples().meow2());
 //        async_lambda(() -> {
 //            System.out.println("START");
 //            Delay.delay(100).await();
@@ -31,8 +60,8 @@ public class Main implements Runnable {
 //                start = end;
 //            }
 //        });
-        lexer();
-        await();
+//        lexer();
+//        await();
     }
 
     void async_lambda(Supplier<Future<?, ?>> lambda){

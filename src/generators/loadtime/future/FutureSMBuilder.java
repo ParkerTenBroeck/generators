@@ -5,10 +5,11 @@ import future.Waker;
 import generators.loadtime.*;
 
 import java.lang.classfile.*;
+import java.lang.classfile.constantpool.InterfaceMethodRefEntry;
 import java.lang.classfile.constantpool.MethodRefEntry;
-import java.lang.constant.ClassDesc;
-import java.lang.constant.ConstantDescs;
-import java.lang.constant.MethodTypeDesc;
+import java.lang.classfile.instruction.SwitchCase;
+import java.lang.constant.*;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.function.Consumer;
@@ -37,7 +38,6 @@ public class FutureSMBuilder extends StateMachineBuilder<FutureSMBuilder> {
             awaiting = sb.create(cob);
             save_label = cob.newLabel();
             resume_inline = cob.newLabel();
-            smb.yielding_state(awaiting, frame);
         }
 
         public ReplacementKind replacementKind(){return ReplacementKind.Immediate;}
@@ -51,6 +51,8 @@ public class FutureSMBuilder extends StateMachineBuilder<FutureSMBuilder> {
             frame.save_stack(smb, cob, sst,1);
             cob.loadLocal(TypeKind.REFERENCE, 2);
 
+
+            smb.yielding_state(awaiting, frame, sst);
             smb.resumable_return(cob, awaiting, TypeKind.REFERENCE);
 
             sst.restore_all(smb, cob);
@@ -89,8 +91,6 @@ public class FutureSMBuilder extends StateMachineBuilder<FutureSMBuilder> {
             resume = sb.create(cob);
             save_ret = cob.newLabel();
             end = cob.newLabel();
-
-            smb.yielding_state(resume, frame);
         }
 
         public ReplacementKind replacementKind(){return ReplacementKind.Immediate;}
@@ -98,14 +98,15 @@ public class FutureSMBuilder extends StateMachineBuilder<FutureSMBuilder> {
         @Override
         public void build_prelude(FutureSMBuilder smb, CodeBuilder cob, Frame frame) {
             cob.labelBinding(save_ret);
-            var saved = frame.save(smb, cob, 2, 0);
+            var sst = frame.save(smb, cob, 2, 0);
 
             resume.setState(smb, cob);
             cob.getstatic(CD_Pending, "INSTANCE", CD_Pending);
 
+            smb.yielding_state(resume, frame, sst);
             smb.resumable_return(cob, resume, TypeKind.REFERENCE);
 
-            saved.restore_all(smb, cob);
+            sst.restore_all(smb, cob);
             cob.goto_(end);
         }
 
@@ -202,31 +203,42 @@ public class FutureSMBuilder extends StateMachineBuilder<FutureSMBuilder> {
         throw new RuntimeException();
     }
 
-    private void yielding_state(StateBuilder.State state, Frame frame){
+    private void yielding_state(StateBuilder.State state, Frame frame, SavedStateTracker sst){
         if(frame.local_annotations().length==0)return;
-        cancellation_behavior.put(state.id(), cob -> {
-            for(var ann : frame.local_annotations()){
-                if(ann.annotation().classSymbol().descriptorString().equals(Cancellation.class.descriptorString())){
-                    ClassDesc owner = frame.locals()[ann.slot()].sym();
-                    ClassDesc param = frame.locals()[ann.slot()].sym();
-                    String name = "cancel";
-                    for(var el : ann.annotation().elements()){
-                        switch(el.name().stringValue()){
-                            case "value" -> name = fromAnnValue(el.value());
-                            case "owner" -> {}
-                            case "param" -> {}
-                            case "ret" -> {}
-                        }
-                        el.name().equalsString("value");
+
+        ArrayList<Consumer<CodeBuilder>> stuff = new ArrayList<>();
+        for(var ann : frame.local_annotations()){
+            if(ann.annotation().classSymbol().descriptorString().equals(Cancellation.class.descriptorString())){
+                var param = sst.load_param(ann.slot()-paramSlotOff+2);
+                ClassDesc owner = frame.locals()[ann.slot()].sym();
+                String name = "cancel";
+                for(var el : ann.annotation().elements()){
+                    switch(el.name().stringValue()){
+                        case "value" -> name = fromAnnValue(el.value());
+                        case "owner" -> {}
+                        case "ret" -> {}
                     }
-                    var mre = cob.constantPool().methodRefEntry(owner, name, MethodTypeDesc.of(ConstantDescs.CD_void));
-                    cob.trying(tcob -> {
-                        tcob.aconst_null()
-//                                .aload(ann.slot())
-                                .invokevirtual(mre);
-                    }, cb -> cb.catchingAll(ccob -> ccob.pop()));
+                    el.name().equalsString("value");
                 }
+                String final_name = name;
+                stuff.add(cob -> {
+                    cob.trying(tcob -> {
+                        tcob.aload(0).getfield(CD_this, param.name(), param.desc());
+                        try{
+                            if(FutureSMBuilder.class.getClassLoader().loadClass(owner.displayName()).isInterface()){
+                                tcob.invokeinterface(owner, final_name, MethodTypeDesc.of(ConstantDescs.CD_void));
+                            }else{
+                                tcob.invokevirtual(owner, final_name, MethodTypeDesc.of(ConstantDescs.CD_void));
+                            }
+                        }catch (Exception e){
+                            throw new RuntimeException(e);
+                        }
+                    }, cb -> cb.catchingAll(ccob -> ccob.pop()));
+                });
             }
+        }
+        cancellation_behavior.put(state.id(), cob -> {
+            for(var thing : stuff) thing.accept(cob);
         });
     }
 
@@ -250,14 +262,20 @@ public class FutureSMBuilder extends StateMachineBuilder<FutureSMBuilder> {
                             .aload(0).aconst_null().putfield(CD_this, AWAITING_FIELD_NAME, CD_Future);
                 });
 
-                for(var cb : cancellation_behavior.entrySet()){
-                    var end = tcob.newLabel();
+                if(!cancellation_behavior.isEmpty()){
+                    var states = cancellation_behavior.entrySet().stream().toList();
+                    var cases = states.stream().map(v -> SwitchCase.of(v.getKey(), tcob.newLabel())).toList();
                     tcob.iload(1);
-                    tcob.loadConstant(cb.getKey());
-                    tcob.if_icmpne(end);
-                    cb.getValue().accept(tcob);
+                    var end = tcob.newLabel();
+                    tcob.tableswitch(end, cases);
+                    for(int i = 0; i < states.size(); i ++){
+                        tcob.labelBinding(cases.get(i).target());
+                        states.get(i).getValue().accept(tcob);
+                        tcob.goto_(end);
+                    }
                     tcob.labelBinding(end);
                 }
+
 
                 this.synchronized_exit(tcob);
                 tcob.return_();

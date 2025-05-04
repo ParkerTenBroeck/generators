@@ -19,13 +19,13 @@ public record Frame(FrameTracker.Type[] locals, FrameTracker.Type[] stack, int b
     public void save_locals(StateMachineBuilder smb, CodeBuilder cob, SavedStateTracker sst, int loc_off){
         int slot = 0;
         for (var entry : locals) {
-            slot++;
+            slot++;// <-----
             if (slot <= smb.paramSlotOff) continue;
 
             if(entry.tag() == FrameTracker.Type.TOP_TYPE.tag())continue;
             if (entry.isCategory2_2nd()) continue;
 
-            sst.save_local(smb, cob, entry.toCD(), slot - smb.paramSlotOff + loc_off - 1);
+            sst.save_local(smb, cob, entry.toCD(), slot - smb.paramSlotOff + loc_off - 1);  //minus one cause increment before here
         }
     }
     public void save_stack(StateMachineBuilder smb, CodeBuilder cob, SavedStateTracker sst, int stack_off) {

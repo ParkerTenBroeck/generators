@@ -4,9 +4,11 @@ import java.lang.classfile.CodeBuilder;
 import java.lang.classfile.TypeKind;
 import java.lang.constant.ClassDesc;
 import java.util.ArrayList;
+import java.util.Objects;
 
 public class SavedStateTracker {
     private final ArrayList<SavedState> saved = new ArrayList<>();
+
     public sealed interface SavedState{
         String name();
     }
@@ -50,6 +52,16 @@ public class SavedStateTracker {
         var s = new LocalState(name, desc, slot);
         saved.add(s);
         return s;
+    }
+
+
+    public LocalState load_param(int slot) {
+        for(var saved : saved){
+            if (saved instanceof LocalState(var name, var desc, int s) && s == slot) {
+                return (LocalState) saved;
+            }
+        }
+        throw new RuntimeException();
     }
 
     public SavedStateTracker restore(StateMachineBuilder<?> smb, CodeBuilder cob, SavedState s){
