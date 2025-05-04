@@ -13,63 +13,10 @@ public class Main implements Runnable {
         RT.runWithGeneratorSupport(Main.class);
     }
 
-
-    static class Meow implements AutoCloseable{
-        {System.out.println("CREATED");}
-        @Override
-        public void close() {
-            System.out.println("CLOSED");
-        }
-        public static AutoCloseable test(){
-            return new Meow();
-        }
-    }
-    synchronized Future<Void, RuntimeException> nya(){
-
-        try(@Cancellation("close") var nya = Meow.test()){
-            System.out.println("POLLED");
-            Future.yield();
-            System.out.println("POLLED");
-            Future.yield();
-            int beep = 1;
-            System.out.println("POLLED");
-            Future.yield();
-            System.out.println("POLLED");
-            Future.yield();
-            return Future.ret(null);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-
-
     @Override
     public void run() {
-//        new Jokio().blocking();
-        var future = nya();
-        future.poll(null);
-        future.poll(null);
-        future.cancel();
-//        new Jokio().blocking(AsyncExamples.meow());
-//        new Jokio().blocking(new AsyncExamples().meow2());
-//        async_lambda(() -> {
-//            System.out.println("START");
-//            Delay.delay(100).await();
-//            System.out.println("END");
-//            return Future.ret();
-//        });
-//        async_lambda(() -> {
-//            var start = System.currentTimeMillis();
-//            while(true){
-//                Util.first(Delay.delay(500), Delay.delay(1000)).await();
-//                var end = System.currentTimeMillis();
-//                System.out.println(end-start);
-//                start = end;
-//            }
-//        });
-//        lexer();
-//        await();
+        lexer();
+        await();
     }
 
     void async_lambda(Supplier<Future<?, ?>> lambda){

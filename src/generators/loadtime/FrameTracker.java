@@ -36,7 +36,6 @@ public class FrameTracker {
         for(var coe : src_com){
             if(coe instanceof Instruction) {
                 frames.add(new Frame(ft.locals(), ft.stack(), ft.bci, ft.current_line_number, ft.local_annotations()));
-                System.out.println(frames.getLast());
             }
             ft.encounter(coe);
         }
