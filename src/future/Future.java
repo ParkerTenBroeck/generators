@@ -8,7 +8,7 @@ public interface Future<R, E extends Throwable> {
         throw new RuntimeException("NO!");
     }
 
-    default void cancel(){}
+    default void cancel() throws E{}
 
     default Future<R, E> non_cancelable(){
         return this::poll;

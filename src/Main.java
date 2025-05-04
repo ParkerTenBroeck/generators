@@ -13,24 +13,32 @@ public class Main implements Runnable {
         RT.runWithGeneratorSupport(Main.class);
     }
 
-    class Meow implements AutoCloseable{
-        {
-            System.out.println("CREATED");
-        }
+
+    static class Meow implements AutoCloseable{
+        {System.out.println("CREATED");}
         @Override
         public void close() {
             System.out.println("CLOSED");
         }
+        public static AutoCloseable test(){
+            return new Meow();
+        }
     }
+    synchronized Future<Void, RuntimeException> nya(){
 
-    Future<Void, RuntimeException> nya(){
-        try(@Cancellation("close") var nya = new Meow()){
+        try(@Cancellation("close") var nya = Meow.test()){
+            System.out.println("POLLED");
             Future.yield();
+            System.out.println("POLLED");
             Future.yield();
             int beep = 1;
+            System.out.println("POLLED");
             Future.yield();
+            System.out.println("POLLED");
             Future.yield();
             return Future.ret(null);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
     }
 
