@@ -1,4 +1,4 @@
-package com.parkertenbroeck.bcms.loadtime;
+package com.parkertenbroeck.bcsm.loadtime;
 
 import java.lang.constant.ClassDesc;
 

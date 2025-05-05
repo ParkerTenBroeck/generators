@@ -1,9 +1,9 @@
-package com.parkertenbroeck.bcms.loadtime;
+package com.parkertenbroeck.bcsm.loadtime;
 
 import com.parkertenbroeck.future.Future;
 import com.parkertenbroeck.generator.Gen;
-import com.parkertenbroeck.bcms.loadtime.future.FutureSMBuilder;
-import com.parkertenbroeck.bcms.loadtime.gen.GenSMBuilder;
+import com.parkertenbroeck.bcsm.loadtime.future.FutureSMBuilder;
+import com.parkertenbroeck.bcsm.loadtime.gen.GenSMBuilder;
 
 import java.io.IOException;
 import java.lang.classfile.*;
@@ -18,6 +18,7 @@ public class StateMachineClassLoader extends ClassLoader {
     private final HashMap<String, Class<?>> customClazzMap = new HashMap<>();
     private final List<String> skip;
     private final HashMap<ClassDesc, SMBB> builders;
+    private final String write_classes_path;
 
     public interface SMBB{
         StateMachineBuilder<?> build(ClassModel src_clm, MethodModel src_mem, CodeModel src_com);
@@ -25,13 +26,14 @@ public class StateMachineClassLoader extends ClassLoader {
     public static class Config{
         HashSet<String> skip = new HashSet<>();
         HashMap<ClassDesc, SMBB> builders = new HashMap<>();
+        String write_classes;
 
         public static Config empty(){
             return new Config();
         }
         public static Config builtin(){
             return empty()
-                    .skip("java", "jdk", "jre", "com.parkertenbroeck.generators.loadtime")
+                    .skip("java", "jdk", "jre", "com.parkertenbroeck.bcsm.loadtime")
                     .with(Future.class, FutureSMBuilder::new)
                     .with(Gen.class, GenSMBuilder::new);
         }
@@ -50,6 +52,11 @@ public class StateMachineClassLoader extends ClassLoader {
             builders.put(ret, builder);
             return this;
         }
+
+        public Config write_classes(String path){
+            write_classes = path;
+            return this;
+        }
     }
 
     public StateMachineClassLoader(ClassLoader parent) {
@@ -60,15 +67,19 @@ public class StateMachineClassLoader extends ClassLoader {
         super(parent);
         skip = config.skip.stream().toList();
         builders = new HashMap<>(config.builders);
+        write_classes_path = config.write_classes;
     }
 
     void add(String name, byte[] def){
-        try {
-            Files.createDirectories(Path.of("build/modified/generators/" + name.replace(".", "/")).getParent());
-            Files.write(Path.of("build/modified/generators/" + name.replace(".", "/") + ".class"), def);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
+        if(write_classes_path!=null){
+            try {
+                Files.createDirectories(Path.of(write_classes_path + name.replace(".", "/")).getParent());
+                Files.write(Path.of(write_classes_path + name.replace(".", "/") + ".class"), def);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
         }
+
         customClazzMap.put(name, defineClass(name, def, 0, def.length));
     }
 

@@ -1,7 +1,7 @@
-package com.parkertenbroeck.bcms;
+package com.parkertenbroeck.bcsm;
 
 
-import com.parkertenbroeck.bcms.loadtime.StateMachineClassLoader;
+import com.parkertenbroeck.bcsm.loadtime.StateMachineClassLoader;
 
 import java.lang.reflect.Modifier;
 import java.util.Set;

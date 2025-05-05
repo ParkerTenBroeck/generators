@@ -1,4 +1,4 @@
-package com.parkertenbroeck.bcms.loadtime.future;
+package com.parkertenbroeck.bcsm.loadtime.future;
 
 import java.lang.annotation.*;
 

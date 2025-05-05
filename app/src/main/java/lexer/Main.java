@@ -1,12 +1,12 @@
 package lexer;
 
 import com.parkertenbroeck.generator.Gen;
-import com.parkertenbroeck.bcms.RT;
-import com.parkertenbroeck.bcms.loadtime.StateMachineClassLoader;
+import com.parkertenbroeck.bcsm.RT;
+import com.parkertenbroeck.bcsm.loadtime.StateMachineClassLoader;
 
 public class Main {
     public static void main(String[] args) {
-        RT.runWithStateMachines(StateMachineClassLoader.Config.builtin(), (Object) args);
+        RT.runWithStateMachines(StateMachineClassLoader.Config.builtin().write_classes("build/modified/generators/"), (Object) args);
 
        lexer();
     }
