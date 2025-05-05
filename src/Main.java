@@ -8,6 +8,7 @@ import generators.loadtime.future.Cancellation;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Path;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 public class Main implements Runnable {
@@ -17,40 +18,50 @@ public class Main implements Runnable {
 
     @Override
     public void run() {
+
+        int value = 0;
+        String meow = "";
+        Function<Integer, String> test = new Function<Integer, String>() {
+            int i = 0;
+            @Override
+            public String apply(Integer i) {
+                return Main.this + meow + value + i;
+            }
+        };
+        System.out.println(test.apply(12));
 //        lexer();
-//        await();
-        try {
-            new Jokio().blocking(files());
-        } catch (IOException ignore) {}
+////        await();
+//        try {
+//            System.out.println(new Jokio().blocking(files()));
+//        } catch (IOException ignore) {}
     }
-
-    static Future<Void, Throwable> files() throws IOException{
-        try(@Cancellation("close") var file = File.open(Path.of("./src/Main.java"))){
-            var buf = ByteBuffer.allocate((int) file.size());
-            var read = file.read_all(buf).await();
-            System.out.println(new String(buf.array(), 0, read));
-        }
-        return Future.ret();
-    }
-
-    void async_lambda(Supplier<Future<?, ?>> lambda){
-        new Jokio().blocking(lambda.get());
-    }
-
-
-    void await(){
-        try{
-            new Jokio().blocking(AsyncExamples.run());
-        }catch (Exception e){
-            throw new RuntimeException(e);
-        }
-    }
-
-
-    void lexer(){
-        var gen = Lexer.parse("f7(x,y,z,w, u,v, othersIg) = v-(x*y+y+ln(z)^2*sin(z*pi/2))/(w*u)+sqrt(othersIg*120e-1)");
-        while(gen.next() instanceof Gen.Yield(var tok)) {
-            System.out.println(tok);
-        }
-    }
+//
+//    static Future<String, IOException> files() throws IOException{
+//        try(@Cancellation("close") var file = File.open(Path.of("./src/Main.java"))){
+//            var buf = ByteBuffer.allocate((int) file.size());
+//            var read = file.read_all(buf).await();
+//            return Future.ret(new String(buf.array(), 0, read));
+//        }
+//    }
+//
+//    <T, E extends Throwable> T async_lambda(Supplier<Future<T, E>> lambda) throws E{
+//        return new Jokio().blocking(lambda.get());
+//    }
+//
+//
+//    void await(){
+//        try{
+//            new Jokio().blocking(AsyncExamples.run());
+//        }catch (Exception e){
+//            throw new RuntimeException(e);
+//        }
+//    }
+//
+//
+//    void lexer(){
+//        var gen = Lexer.parse("f7(x,y,z,w, u,v, othersIg) = v-(x*y+y+ln(z)^2*sin(z*pi/2))/(w*u)+sqrt(othersIg*120e-1)");
+//        while(gen.next() instanceof Gen.Yield(var tok)) {
+//            System.out.println(tok);
+//        }
+//    }
 }
