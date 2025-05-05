@@ -54,7 +54,7 @@ public class SavedStateTracker {
     }
 
 
-    public LocalState load_param(int slot) {
+    public LocalState get_saved_local(int slot) {
         for(var saved : saved){
             if (saved instanceof LocalState(var name, var desc, int s) && s == slot) {
                 return (LocalState) saved;

@@ -20,6 +20,14 @@ tasks.withType<JavaCompile> {
     options.compilerArgs.add("--enable-preview")
 }
 
+tasks.register<JavaExec>("basic"){
+    javaLauncher.set(javaToolchains.launcherFor(java.toolchain))
+    jvmArgs("--enable-preview")
+    group = "Demos"
+    mainClass = "basic.Main"
+    classpath = sourceSets["main"].runtimeClasspath
+}
+
 tasks.register<JavaExec>("lexer"){
     javaLauncher.set(javaToolchains.launcherFor(java.toolchain))
     jvmArgs("--enable-preview")

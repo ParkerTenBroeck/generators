@@ -6,6 +6,7 @@ import com.parkertenbroeck.async_runtime.io.net.ServerSocket;
 import com.parkertenbroeck.async_runtime.io.net.Socket;
 import com.parkertenbroeck.future.Future;
 import com.parkertenbroeck.bcsm.loadtime.future.Cancellation;
+import com.parkertenbroeck.future.Waker;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;

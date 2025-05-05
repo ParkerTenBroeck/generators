@@ -1,6 +1,5 @@
 package com.parkertenbroeck.bcsm.loadtime;
 
-
 import java.lang.classfile.*;
 import java.lang.classfile.attribute.RuntimeInvisibleTypeAnnotationsAttribute;
 import java.lang.classfile.attribute.RuntimeVisibleTypeAnnotationsAttribute;
@@ -8,6 +7,7 @@ import java.lang.classfile.attribute.StackMapFrameInfo;
 import java.lang.classfile.attribute.StackMapTableAttribute;
 import java.lang.classfile.instruction.*;
 import java.lang.constant.*;
+import java.lang.reflect.AccessFlag;
 import java.util.*;
 
 import static java.lang.constant.ConstantDescs.*;
@@ -180,24 +180,28 @@ public class FrameTracker {
         this.smb = smb;
         int offset = 0;
 
-        for (var param : smb.params) {
-            if(param == CD_long){
+
+
+        for (int i = 0; i < smb.params.length; i++) {
+            var param = smb.params[i];
+
+            if (param == CD_long) {
                 setLocal2(offset, Type.DOUBLE_TYPE, Type.DOUBLE2_TYPE);
-            }else if(param == CD_double){
+            } else if (param == CD_double) {
                 setLocal2(offset, Type.LONG_TYPE, Type.LONG2_TYPE);
-            }else if(!param.isPrimitive()){
+            } else if (!param.isPrimitive()) {
                 setLocal(offset, Type.referenceType(param));
-            }else if(param == CD_float){
+            } else if (param == CD_float) {
                 setLocal(offset, Type.FLOAT_TYPE);
-            }else if(param == CD_char){
+            } else if (param == CD_char) {
                 setLocal(offset, Type.CHAR_TYPE);
-            }else if(param == CD_boolean){
+            } else if (param == CD_boolean) {
                 setLocal(offset, Type.BOOLEAN_TYPE);
-            }else if(param == CD_byte){
+            } else if (param == CD_byte) {
                 setLocal(offset, Type.BYTE_TYPE);
-            }else if(param == CD_short){
+            } else if (param == CD_short) {
                 setLocal(offset, Type.SHORT_TYPE);
-            }else{
+            } else {
                 setLocal(offset, Type.INTEGER_TYPE);
             }
             offset += TypeKind.from(param).slotSize();
@@ -412,6 +416,11 @@ public class FrameTracker {
                                     decStack(4).pushStack(Type.DOUBLE_TYPE, Type.DOUBLE2_TYPE);
                             case DNEG ->
                                     decStack(2).pushStack(Type.DOUBLE_TYPE, Type.DOUBLE2_TYPE);
+
+                            case LCMP, DCMPL, DCMPG ->
+                                    decStack(4).pushStack(Type.INTEGER_TYPE);
+                            case FCMPL, FCMPG ->
+                                    decStack(2).pushStack(Type.INTEGER_TYPE);
                             default -> throw new RuntimeException();
                         }
                     }

@@ -12,6 +12,8 @@ import java.lang.reflect.AccessFlag;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static java.lang.constant.ConstantDescs.*;
+
 public abstract class StateMachineBuilder<T extends StateMachineBuilder<T>> {
     public final static String PARAM_PREFIX = "param_";
     public final static String LOCAL_PREFIX = "local_";
@@ -33,6 +35,8 @@ public abstract class StateMachineBuilder<T extends StateMachineBuilder<T>> {
 
     protected final HashMap<SpecialMethod, SpecialMethodBuilder<T>> smmap = new HashMap<>();
 
+    public record ParameterVariableAnnotation(Annotation annotation, String param, ClassDesc desc){}
+    protected final List<ParameterVariableAnnotation> parameterVariableAnnotations = new ArrayList<>();
 
 
     record LState(String name, ClassDesc cd) {
@@ -63,6 +67,7 @@ public abstract class StateMachineBuilder<T extends StateMachineBuilder<T>> {
                         .replace("/", "___")
                         .replace(";", "____")
                         .replace("[", "_____")
+                        .replace(".", "______")
                 )
                 .collect(Collectors.joining("$"));
         innerClassName = method_name + "______" + param_cnd;
@@ -72,6 +77,25 @@ public abstract class StateMachineBuilder<T extends StateMachineBuilder<T>> {
         this.params = mts.parameterArray();
         this.MTD_init = MethodTypeDesc.of(ConstantDescs.CD_void, params);
         this.paramSlotOff = Arrays.stream(params).mapToInt(p -> TypeKind.from(p).slotSize()).sum();
+
+
+        ArrayList<List<Annotation>> param_attrs;
+        var param_ann = src_mem.findAttributes(Attributes.runtimeVisibleParameterAnnotations());
+        if(!param_ann.isEmpty()) {
+            param_attrs = new ArrayList<>(param_ann.getFirst().parameterAnnotations());
+            if(!src_mem.flags().has(AccessFlag.STATIC)){
+                param_attrs.addFirst(List.of());
+            }
+        }else
+            param_attrs = new ArrayList<>(Collections.nCopies((src_mem.flags().has(AccessFlag.STATIC)?0:1)+src_mem.methodTypeSymbol().parameterList().size(), List.of()));
+
+        int offset = 0;
+        for (int i = 0; i < params.length; i++) {
+            var param = params[i];
+            for(var attr : param_attrs.get(i))
+                parameterVariableAnnotations.add(new ParameterVariableAnnotation(attr, StateMachineBuilder.PARAM_PREFIX + offset, param));
+            offset += TypeKind.from(param).slotSize();
+        }
 
         frames = FrameTracker.frames(this, src_com);
     }

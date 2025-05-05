@@ -183,63 +183,58 @@ public class FutureSMBuilder extends StateMachineBuilder<FutureSMBuilder> {
         ArrayList<Consumer<CodeBuilder>> field_cancellation_behavior = new ArrayList<>();
         for(var ann : frame.local_annotations()){
             if(ann.annotation().classSymbol().descriptorString().equals(Cancellation.class.descriptorString())){
-                var param = sst.load_param(ann.slot()-paramSlotOff+2);
+                var param = sst.get_saved_local(ann.slot()-paramSlotOff+2);
                 ClassDesc owner = frame.locals()[ann.slot()].sym();
-                String name = "cancel";
-                for(var el : ann.annotation().elements()){
-                    switch(el.name().stringValue()){
-                        case "value" -> name = annotationStringValue(el.value());
-                        case "owner" -> owner = annotationClassValue(el.value());
-                    }
-                }
-
-                if(!owner.isClassOrInterface()){
-                    throw new RuntimeException("Owner " + owner + " is not a class/interface cannot be used here");
-                }
-                boolean is_interface;
-                TypeKind ret;
-                try{
-                    Class<?> clazz = getClass().getClassLoader().loadClass(owner.descriptorString().replace("/", ".").replace(";", "").substring(1));
-
-                    var method = findMethod(clazz, name);
-                    if(method==null){
-                        throw new RuntimeException("Cannot find method '"+name+"' for class " + clazz);
-                    }
-                    clazz = method.getDeclaringClass();
-                    owner = ClassDesc.ofDescriptor(clazz.descriptorString());
-                    is_interface = clazz.isInterface();
-                    ret = TypeKind.from(ClassDesc.ofDescriptor(method.getReturnType().descriptorString()));
-                }catch (Exception e){
-                    throw new RuntimeException(e);
-                }
-
-                String final_name = name;
-                ClassDesc final_owner = owner;
-
-                field_cancellation_behavior.add(cob -> {
-                    cob.trying(tcob -> {
-                        tcob.aload(0).getfield(CD_this, param.name(), param.desc());
-                        if(is_interface){
-                            tcob.invokeinterface(final_owner, final_name, MethodTypeDesc.of(ConstantDescs.CD_void));
-                        }else{
-                            tcob.invokevirtual(final_owner, final_name, MethodTypeDesc.of(ConstantDescs.CD_void));
-                        }
-                        if(ret.slotSize()==1)tcob.pop();
-                        if(ret.slotSize()==2)tcob.pop2();
-                    }, cb -> cb.catchingAll(ccob -> {
-                        ccob.aload(2).ifThenElse(Opcode.IFNONNULL, bcob -> {
-                            bcob.aload(2).swap();
-                            addSuppressed(bcob);
-                        }, bcob -> {
-                            bcob.astore(2);
-                        });
-                    }));
-                });
+                field_cancellation_behavior.add(make_canceler(param.name(), param.desc(), methodFromCancellationAnnotation(ann.annotation(), owner)));
             }
         }
         cancellation_behavior.put(state.id(), cob -> {
             for(var fcb : field_cancellation_behavior) fcb.accept(cob);
         });
+    }
+
+    private Method methodFromCancellationAnnotation(Annotation annotation, ClassDesc owner){
+        String name = "cancel";
+        for(var el : annotation.elements()){
+            if (el.name().stringValue().equals("value")) {
+                name = annotationStringValue(el.value());
+            }
+        }
+
+        try{
+            Class<?> clazz = getClass().getClassLoader().loadClass(owner.descriptorString().replace("/", ".").replace(";", "").substring(1));
+            var method = findMethod(clazz, name);
+            if(method==null)
+                throw new RuntimeException("Cannot find method '"+name+"' for class " + clazz);
+
+            return method;
+        }catch (Exception e){
+            throw new RuntimeException(e);
+        }
+    }
+
+    private Consumer<CodeBuilder> make_canceler(String field_name, ClassDesc field_desc, Method method) {
+        var owner = ClassDesc.ofDescriptor(method.getDeclaringClass().descriptorString());
+        return cob -> {
+            cob.trying(tcob -> {
+                tcob.aload(0).getfield(CD_this, field_name, field_desc);
+                if (method.getDeclaringClass().isInterface()) {
+                    tcob.invokeinterface(owner, method.getName(), MethodTypeDesc.of(ConstantDescs.CD_void));
+                } else {
+                    tcob.invokevirtual(owner, method.getName(), MethodTypeDesc.of(ConstantDescs.CD_void));
+                }
+                var ret = TypeKind.from(method.getReturnType());
+                if (ret.slotSize() == 1) tcob.pop();
+                if (ret.slotSize() == 2) tcob.pop2();
+            }, cb -> cb.catchingAll(ccob -> {
+                ccob.aload(2).ifThenElse(Opcode.IFNONNULL, bcob -> {
+                    bcob.aload(2).swap();
+                    addSuppressed(bcob);
+                }, bcob -> {
+                    bcob.astore(2);
+                });
+            }));
+        };
     }
 
     private static Method findMethod(Class<?> owner, String name){
@@ -274,8 +269,13 @@ public class FutureSMBuilder extends StateMachineBuilder<FutureSMBuilder> {
         clb.withMethod("cancel", MethodTypeDesc.of(ConstantDescs.CD_void),  ClassFile.ACC_PUBLIC, mb -> mb.withCode(cob -> {
 
             this.synchronized_start(cob);
+
             cob.aload(0).getfield(CD_this, STATE_NAME, ConstantDescs.CD_int).istore(1);// state
             cob.aconst_null().astore(2);// exception
+            cob.iload(1).loadConstant(-1).ifThen(Opcode.IF_ICMPEQ, bob -> {
+                this.synchronized_exit(bob);
+                bob.return_();
+            });
             cob.aload(0).loadConstant(-1).putfield(CD_this, STATE_NAME, ConstantDescs.CD_int);
 
             cob.aload(0).getfield(CD_this, AWAITING_FIELD_NAME, CD_Future).ifThen(Opcode.IFNONNULL, boc -> {
@@ -308,6 +308,10 @@ public class FutureSMBuilder extends StateMachineBuilder<FutureSMBuilder> {
                     cob.goto_(end);
                 }
                 cob.labelBinding(end);
+            }
+
+            for(var la : this.parameterVariableAnnotations){
+                make_canceler(la.param(), la.desc(), methodFromCancellationAnnotation(la.annotation(), la.desc())).accept(cob);
             }
 
 
