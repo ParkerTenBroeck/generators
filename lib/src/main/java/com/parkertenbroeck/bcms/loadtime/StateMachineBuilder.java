@@ -1,4 +1,4 @@
-package com.parkertenbroeck.generators.loadtime;
+package com.parkertenbroeck.bcms.loadtime;
 
 import java.lang.classfile.*;
 import java.lang.classfile.attribute.InnerClassInfo;
@@ -65,8 +65,8 @@ public abstract class StateMachineBuilder<T extends StateMachineBuilder<T>> {
                         .replace("[", "_____")
                 )
                 .collect(Collectors.joining("$"));
-        innerClassName = method_name;
-        var name = cdn + "$" +innerClassName;
+        innerClassName = method_name + "______" + param_cnd;
+        var name = cdn + "$" + innerClassName;
 
         this.CD_this = ClassDesc.of(src_clm.thisClass().asSymbol().packageName(), name);
         this.params = mts.parameterArray();
@@ -116,7 +116,7 @@ public abstract class StateMachineBuilder<T extends StateMachineBuilder<T>> {
 
             if(shouldBeInnerClass()){
                 src_clm.findAttributes(Attributes.sourceFile()).forEach(clb::with);
-                clb.with(InnerClassesAttribute.of(InnerClassInfo.of(CD_this, Optional.of(src_clm.thisClass().asSymbol()), Optional.of(innerClassName), AccessFlag.PUBLIC)));
+                clb.with(InnerClassesAttribute.of(InnerClassInfo.of(CD_this, Optional.empty(), Optional.empty(), AccessFlag.PUBLIC)));
                 clb.with(NestHostAttribute.of(src_clm.thisClass()));
             }
 
@@ -128,7 +128,7 @@ public abstract class StateMachineBuilder<T extends StateMachineBuilder<T>> {
             clb.withField(STATE_NAME, ConstantDescs.CD_int, ClassFile.ACC_PRIVATE);
 
             // constructor
-            clb.withMethod(ConstantDescs.INIT_NAME, MTD_init, ClassFile.ACC_PUBLIC, mb -> mb.withCode(cob -> {
+            clb.withMethod(ConstantDescs.INIT_NAME, MTD_init, ClassFile.ACC_PRIVATE, mb -> mb.withCode(cob -> {
                 cob.aload(0).invokespecial(ConstantDescs.CD_Object, ConstantDescs.INIT_NAME, ConstantDescs.MTD_void);
                 params(1, (param, slot, type) -> {
                     cob.aload(0).loadLocal(TypeKind.from(type), slot).putfield(CD_this, param, type);

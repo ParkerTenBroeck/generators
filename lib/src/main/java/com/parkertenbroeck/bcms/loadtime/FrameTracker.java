@@ -1,4 +1,4 @@
-package com.parkertenbroeck.generators.loadtime;
+package com.parkertenbroeck.bcms.loadtime;
 
 
 import java.lang.classfile.*;
@@ -30,7 +30,7 @@ public class FrameTracker {
             ITEM_LONG_2ND = 13,
             ITEM_DOUBLE_2ND = 14;
 
-    public static ArrayList<Frame> frames(StateMachineBuilder smb, CodeModel src_com) {
+    public static ArrayList<Frame> frames(StateMachineBuilder<?> smb, CodeModel src_com) {
         var ft = new FrameTracker(smb, src_com);
         var frames = new ArrayList<Frame>();
         for(var coe : src_com){
@@ -496,6 +496,16 @@ public class FrameTracker {
         }
     }
 
+    private void pushFromStackMapFrame(List<Type> list, Type type){
+        list.add(type);
+        if(type.tag() == Type.LONG_TYPE.tag()){
+            list.add(Type.LONG2_TYPE);
+        }
+        if(type.tag() == Type.DOUBLE2_TYPE.tag()){
+            list.add(Type.DOUBLE2_TYPE);
+        }
+    }
+
     public void encounterLabel(Label l) {
         if(annotationStartMap.get(l) instanceof ArrayList<LocalVariableAnnotation> list)
             activeAnnotations.addAll(list);
@@ -507,11 +517,11 @@ public class FrameTracker {
         if (tmp != null) {
             stack.clear();
             locals.clear();
-            for( var sl : tmp.stack())
-                pushStack(Type.verificationType(sl, this));
+            for(var sl : tmp.stack())
+                pushFromStackMapFrame(stack, Type.verificationType(sl, this));
 
-            for( var sl : tmp.locals())
-                locals.add(Type.verificationType(sl, this));
+            for(var lv : tmp.locals())
+                pushFromStackMapFrame(locals, Type.verificationType(lv, this));
         }
     }
 }

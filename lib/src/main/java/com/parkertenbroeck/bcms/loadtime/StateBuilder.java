@@ -1,4 +1,4 @@
-package com.parkertenbroeck.generators.loadtime;
+package com.parkertenbroeck.bcms.loadtime;
 
 import java.lang.classfile.CodeBuilder;
 import java.lang.classfile.Label;

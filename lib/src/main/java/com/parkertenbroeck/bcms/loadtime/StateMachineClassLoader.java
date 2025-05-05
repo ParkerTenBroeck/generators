@@ -1,25 +1,65 @@
-package com.parkertenbroeck.generators.loadtime;
+package com.parkertenbroeck.bcms.loadtime;
 
 import com.parkertenbroeck.future.Future;
-import com.parkertenbroeck.gen.Gen;
-import com.parkertenbroeck.generators.loadtime.future.FutureSMBuilder;
-import com.parkertenbroeck.generators.loadtime.gen.GenSMBuilder;
+import com.parkertenbroeck.generator.Gen;
+import com.parkertenbroeck.bcms.loadtime.future.FutureSMBuilder;
+import com.parkertenbroeck.bcms.loadtime.gen.GenSMBuilder;
 
 import java.io.IOException;
 import java.lang.classfile.*;
 import java.lang.classfile.attribute.*;
 import java.lang.classfile.constantpool.ClassEntry;
 import java.lang.constant.ClassDesc;
-import java.lang.reflect.AccessFlag;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 
-public class GeneratorClassLoader extends ClassLoader {
+public class StateMachineClassLoader extends ClassLoader {
     private final HashMap<String, Class<?>> customClazzMap = new HashMap<>();
+    private final List<String> skip;
+    private final HashMap<ClassDesc, SMBB> builders;
 
-    public GeneratorClassLoader(ClassLoader parent) {
+    public interface SMBB{
+        StateMachineBuilder<?> build(ClassModel src_clm, MethodModel src_mem, CodeModel src_com);
+    }
+    public static class Config{
+        HashSet<String> skip = new HashSet<>();
+        HashMap<ClassDesc, SMBB> builders = new HashMap<>();
+
+        public static Config empty(){
+            return new Config();
+        }
+        public static Config builtin(){
+            return empty()
+                    .skip("java", "jdk", "jre", "com.parkertenbroeck.generators.loadtime")
+                    .with(Future.class, FutureSMBuilder::new)
+                    .with(Gen.class, GenSMBuilder::new);
+        }
+
+        public Config skip(String... paths){
+            skip.addAll(List.of(paths));
+            return this;
+        }
+
+        public Config with(Class<?> ret, SMBB builder){
+            builders.put(ClassDesc.ofDescriptor(ret.descriptorString()), builder);
+            return this;
+        }
+
+        public Config with(ClassDesc ret, SMBB builder){
+            builders.put(ret, builder);
+            return this;
+        }
+    }
+
+    public StateMachineClassLoader(ClassLoader parent) {
+        this(parent, Config.builtin());
+    }
+
+    public StateMachineClassLoader(ClassLoader parent, Config config) {
         super(parent);
+        skip = config.skip.stream().toList();
+        builders = new HashMap<>(config.builders);
     }
 
     void add(String name, byte[] def){
@@ -36,23 +76,23 @@ public class GeneratorClassLoader extends ClassLoader {
     public Class<?> loadClass(String name) throws ClassNotFoundException {
         if (customClazzMap.get(name) instanceof Class<?> clazz)
             return clazz;
-        if (name.startsWith("java"))
-            return super.loadClass(name);
+        for(var item : skip)
+            if(name.startsWith(item))
+                return super.loadClass(name);
+
 
         var p = "/" + name.replace('.', '/') + ".class";
-        try (var stream = GeneratorClassLoader.class.getResourceAsStream(p)) {
+        try (var stream = StateMachineClassLoader.class.getResourceAsStream(p)) {
             var bytes = Objects.requireNonNull(stream).readAllBytes();
-            add(name, searchReplaceMethods(bytes));
+            add(name, searchReplaceableMethods(bytes));
             return customClazzMap.get(name);
         } catch (IOException e) {
             throw new ClassNotFoundException(name, e);
         }
     }
 
-    public byte[] searchReplaceMethods(byte[] in) {
+    public byte[] searchReplaceableMethods(byte[] in) {
         var clm = ClassFile.of(ClassFile.AttributesProcessingOption.PASS_ALL_ATTRIBUTES).parse(in);
-        var isGen = clm.thisClass().asSymbol().descriptorString().equals(Gen.class.descriptorString());
-        var isFuture = clm.thisClass().asSymbol().descriptorString().equals(Future.class.descriptorString());
 
 
         var nestMem = new ArrayList<ClassDesc>();
@@ -62,23 +102,21 @@ public class GeneratorClassLoader extends ClassLoader {
 
         return ClassFile.of(ClassFile.AttributesProcessingOption.PASS_ALL_ATTRIBUTES, ClassFile.StackMapsOption.STACK_MAPS_WHEN_REQUIRED).build(clm.thisClass().asSymbol(), cb -> {
             for (var ce : clm) {
-                if (ce instanceof MethodModel mem && !isGen && !isFuture && mem.code().isPresent()) {
-                    StateMachineBuilder<?> builder;
-                    if(mem.methodTypeSymbol().returnType().descriptorString().equals(Gen.class.descriptorString())){
-                        builder = new GenSMBuilder(clm, mem, mem.code().get());
-                    }else if(mem.methodTypeSymbol().returnType().descriptorString().equals(Future.class.descriptorString())){
-                        builder = new FutureSMBuilder(clm, mem, mem.code().get());
-                    }else{
-                        builder= null;
-                    }
+                if (ce instanceof MethodModel mem && mem.code().isPresent()) {
+                    StateMachineBuilder<?> builder = builders
+                            .getOrDefault(
+                                    mem.methodTypeSymbol().returnType(),
+                                    (_, _, _) -> null
+                            ).build(clm, mem, mem.code().get());
+
                     if(builder!=null&&builder.hasAnyHandlers()){
                         add(builder.CD_this.packageName() + "." + builder.CD_this.displayName(), builder.buildStateMachine());
                         cb.withMethod(mem.methodName(), mem.methodType(), mem.flags().flagsMask()&~ClassFile.ACC_SYNCHRONIZED, mb -> {
                             mb.withCode(builder::buildSourceMethodShim);
                         });
                         if(builder.shouldBeInnerClass()){
-                            innerCl.add(InnerClassInfo.of(builder.CD_this, Optional.of(clm.thisClass().asSymbol()), Optional.of(builder.innerClassName)));
-                            nestMem.add(ClassDesc.of(builder.CD_this.displayName()));
+                            innerCl.add(InnerClassInfo.of(builder.CD_this, Optional.empty(), Optional.empty()));
+                            nestMem.add(builder.CD_this);
                         }
                     }else{
                         cb.with(mem);

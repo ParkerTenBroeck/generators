@@ -1,3 +1,5 @@
+version = "0.1.0"
+
 plugins {
     `java-library`
 }
@@ -11,6 +13,7 @@ dependencies {
     testImplementation(libs.junit.jupiter)
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
+
 
 java {
     toolchain {

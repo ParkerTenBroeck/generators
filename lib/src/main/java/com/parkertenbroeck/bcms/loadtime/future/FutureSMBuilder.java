@@ -1,8 +1,8 @@
-package com.parkertenbroeck.generators.loadtime.future;
+package com.parkertenbroeck.bcms.loadtime.future;
 
 import com.parkertenbroeck.future.Future;
 import com.parkertenbroeck.future.Waker;
-import com.parkertenbroeck.generators.loadtime.*;
+import com.parkertenbroeck.bcms.loadtime.*;
 
 import java.lang.classfile.*;
 import java.lang.classfile.instruction.SwitchCase;

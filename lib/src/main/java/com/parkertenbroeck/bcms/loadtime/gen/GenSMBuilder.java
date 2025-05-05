@@ -1,7 +1,7 @@
-package com.parkertenbroeck.generators.loadtime.gen;
+package com.parkertenbroeck.bcms.loadtime.gen;
 
-import com.parkertenbroeck.gen.Gen;
-import com.parkertenbroeck.generators.loadtime.*;
+import com.parkertenbroeck.generator.Gen;
+import com.parkertenbroeck.bcms.loadtime.*;
 
 import java.lang.classfile.*;
 import java.lang.constant.ClassDesc;

@@ -1,4 +1,4 @@
-package com.parkertenbroeck.gen;
+package com.parkertenbroeck.generator;
 
 public interface Gen<Y, R> {
     Res<Y, R> next();

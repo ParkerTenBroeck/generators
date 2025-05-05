@@ -92,7 +92,7 @@ public class Socket implements AutoCloseable, Readable<IOException>, Writable<IO
     public Future<Integer, IOException> write_all(ByteBuffer buffer){
         var wrote = buffer.remaining();
         return waker -> {
-            socket.write(buffer);
+            var nya = socket.write(buffer);
             if(!buffer.hasRemaining()) return wrote;
             SELECTOR.register(socket, SelectionKey.OP_WRITE, waker);
             return Future.Pending.INSTANCE;
@@ -103,6 +103,7 @@ public class Socket implements AutoCloseable, Readable<IOException>, Writable<IO
     public Future<Integer, IOException> read(ByteBuffer buffer){
         return waker -> {
             var read = socket.read(buffer);
+            if(read == -1)throw new IOException("Reached end of stream");
             if(read!=0) return read;
             SELECTOR.register(socket, SelectionKey.OP_READ, waker);
             return Future.Pending.INSTANCE;
