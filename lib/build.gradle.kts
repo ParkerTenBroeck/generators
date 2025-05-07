@@ -1,4 +1,5 @@
 version = "0.1.0"
+group = "com.parkertenbroeck.generators"
 
 plugins {
     `java-library`
@@ -13,6 +14,7 @@ dependencies {
     testImplementation(libs.junit.jupiter)
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
+
 
 
 java {
