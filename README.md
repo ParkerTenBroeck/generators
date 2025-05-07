@@ -36,6 +36,31 @@ public static Gen<Long, Void> primes() {
 }
 ```
 
+## Use this library
+
+```kotlin
+// settings.gradle.kts
+sourceControl {
+    gitRepository(URI.create("https://github.com/ParkerTenBroeck/generators.git")) {
+        producesModule("com.parkertenbroeck.generators:lib")
+    }
+}
+
+// build.gradle.kts
+implementation("com.parkertenbroeck.generators:lib:0.1.0")
+```
+
+This library requires the application be ran with a custom class loader, there is a utility provided to make this easier.
+```java
+public static void main(String[] args) {
+    // loads the current class with a custom class loader and calls *this* method with the provided arguments.
+    // *this* method - the one used to call `runWithStateMachines`
+    RT.runWithStateMachines(StateMachineClassLoader.Config.builtin(), (Object) args); 
+
+    // past this point generators will be created on methods which match the criteria
+}
+```
+
 ## How does it know what functions to transform?
 
 Detection is done by 
@@ -64,31 +89,6 @@ public static Future<Void, RuntimeException> regular_function() {
 ### Why not annotations?
 Unfortunately annotations cannot be put on lambdas. 
 
-## Use this library
-
-```kotlin
-// settings.gradle.kts
-sourceControl {
-    gitRepository(URI.create("https://github.com/ParkerTenBroeck/generators.git")) {
-        producesModule("com.parkertenbroeck.generators:lib")
-    }
-}
-
-// build.gradle.kts
-implementation("com.parkertenbroeck.generators:lib:0.1.0")
-```
-
-This library requires the application be ran with a custom class loader, there is a utility provided to make this easier.
-```java
-public static void main(String[] args) {
-    // loads the current class with a custom class loader and calls *this* method with the provided arguments.
-    // *this* method - the one used to call `runWithStateMachines`
-    RT.runWithStateMachines(StateMachineClassLoader.Config.builtin(), (Object) args); 
-
-    // past this point generators will be created on methods which match the criteria
-}
-```
-
 
 ## Oddities
 
@@ -110,7 +110,38 @@ public static Future<Void, IOException> echo(🔷@Cancellation("close") Socket s
 
 ## Things to watch out for
 
-### Future errors are not type checked
+### Await function works specifically for the Future type
+
+```java
+class MyFuture implements Future<String, RuntimeException>{
+    public Object poll(Waker waker){ /* code */ }
+}
+
+void Future<Void, RuntimeException> wrong() {
+    new MyFuture().await();//⚡
+    return Future.ret();
+}
+```
+Internally the await call will become a `invokevirtual` call to `await` on `MyFuture`. Which will not currently be recognized as a "special" method to transform.
+
+To avoid this use static methods to return a future and make manually implemented futures have private/protected constructors
+```java
+class MyFuture implements Future<String, RuntimeException>{
+    private MyFuture(){}
+    public static Future<String, RuntimeException> make(){
+        return new MyFuture();
+    }
+    public Object poll(Waker waker){ /* code */ }
+}
+
+void Future<Void, RuntimeException> wrong() {
+    MyFuture.make().await();
+    return Future.ret();
+}
+```
+
+
+### Future exceptions are not type checked
 ```java
 public static Future<Void, RuntimeException> wrong() throws Exception {
   Waker.waker().wake();
@@ -289,3 +320,10 @@ public static Future<Void, IOException> example(Socket socket, String message) {
     };
 }
 ```
+
+## Potential additions
+
+- Type checking during transformations
+- Better debugger support (Currently line stepping is generally supported but most breakpoint sets are not working)
+- Annotations (possibly integration during build time)
+- More library features (async)
