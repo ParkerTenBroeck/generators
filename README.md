@@ -61,6 +61,35 @@ public static Future<Void, RuntimeException> regular_function() {
 }
 ```
 
+### Why not annotations?
+Unfortunately annotations cannot be put on lambdas. 
+
+## Use this library
+
+```kotlin
+// settings.gradle.kts
+sourceControl {
+    gitRepository(URI.create("https://github.com/ParkerTenBroeck/generators.git")) {
+        producesModule("com.parkertenbroeck.generators:lib")
+    }
+}
+
+// build.gradle.kts
+implementation("com.parkertenbroeck.generators:lib:0.1.0")
+```
+
+This library requires the application be ran with a custom class loader, there is a utility provided to make this easier.
+```java
+public static void main(String[] args) {
+    // loads the current class with a custom class loader and calls *this* method with the provided arguments.
+    // *this* method - the one used to call `runWithStateMachines`
+    RT.runWithStateMachines(StateMachineClassLoader.Config.builtin(), (Object) args); 
+
+    // past this point generators will be created on methods which match the criteria
+}
+```
+
+
 ## Oddities
 
 ```java
@@ -130,7 +159,7 @@ public static Future<Void, RuntimeException> add_reorder() {
 
 ### synchronized
 
-when a generator/future method is declared as `synchronized` the `next`/`poll`/`cancel` functions will all be synchronized over the instance or class which the method was declared in.
+when a generator/future method is declared as `synchronized` the `next`/`poll`/`cancel` functions will all be synchronized over the instance or class the method was declared in.
 
 it is important to note that the monitor is **NOT** held across suspend points where the function returns.
 
@@ -146,22 +175,7 @@ static Future<Void, RuntimeException> unsync(Object value) {
 
 ## How this works
 
-This library requires the application be ran with a custom class loader as follows (this can be done manually if needed)
-```java
-public static void main(String[] args) {
-    // loads the current class with a custom class loader and calls *this* method with the provided arguments.
-    // *this* method - the one used to call `runWithStateMachines`
-    RT.runWithStateMachines(StateMachineClassLoader.Config.builtin(), (Object) args); 
-
-    // past this point generators will be created on methods which match the criteria
-}
-```
-
-Once finished any class loaded will be scanned for methods which match a particular signature.
-
-When matched a shim is introduced into the source method and a class is constructed which stores all state for the future/generator
-
-A basic example here where we have some parameters 
+Say we have some async function like this.
 ```java
 public static Future<Void, IOException> example(@Cancellation("close") Socket socket, String message) throws IOException {
     try(socket){
@@ -170,6 +184,8 @@ public static Future<Void, IOException> example(@Cancellation("close") Socket so
     return Future.ret();
 }
 ```
+The loader will see the methods which it needs to transform, then modify the bytecode, transforming the function into a class where state across suspend points is saved/restored (local variables & the current state of the stack). 
+
 This is a (modified) decompiled version of the generated method. 
 ```java
 public static Future<Void, IOException> example(Socket socket, String message) {
@@ -273,10 +289,3 @@ public static Future<Void, IOException> example(Socket socket, String message) {
     };
 }
 ```
-### Steps
-- A functions signature and code is determined to be "of interest"
-- When a function is found we wish to modify it first builds a frame(locals, stack, annotations) for every area of interest in the function
-- The number of unique locations which can be suspended from are kept track of
-- A switch is built which handles each state the function can resume from setting up any locals/stack that needs to be resumed as well as setting up the code for saving locals/stack state
-- the locations which special methods are found are modified to perform their particular function and potentially save state and return
-- (Futures) generate cancellation code for locals which have specified so, and cancellation for a pending future.
